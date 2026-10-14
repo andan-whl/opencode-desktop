@@ -81,7 +81,7 @@ The `deploy` GitHub Actions workflow uses SST to deploy the web app from these b
 
 Changes merged into `v2` reach the beta site when they are promoted to `beta`. The beta SST stage deploys
 only the web app, using the same `WebApp` StaticSite definition as production. It sets the build channel
-and Sentry environment to `beta` without deploying the API, console, database, or billing infrastructure.
+to `beta` without deploying the API, console, database, or billing infrastructure.
 
 `VITE_OPENCODE_SERVER_MODE` controls which server the web build provides at startup:
 
@@ -118,7 +118,7 @@ browser local-network permissions can allow some HTTP LAN connections.
 QR scanning is enabled only in a browser-reported secure context with camera support and an available
 video input; insecure pages and unavailable cameras show an explanation beside the disabled action.
 
-The workflow reuses the repository's `CLOUDFLARE_API_TOKEN` and web Sentry settings. The Cloudflare token
+The workflow reuses the repository's `CLOUDFLARE_API_TOKEN`. The Cloudflare token
 must cover SST's R2 state storage, KV assets, Workers, and custom-domain management in the account that
 owns `opencode.ai`. The beta GitHub environment must allow deployments from the `beta` branch; it does not
 need AWS credentials.

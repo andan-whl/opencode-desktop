@@ -461,6 +461,11 @@ export function fromPromise(plugin: Plugin) {
           rpc: yield* rpcFromEffect(host.rpc, streams),
           skill: {
             list: adaptApiMethod(SkillEndpoints["skill.list"], host.skill.list),
+            install: adaptApiMethod(SkillEndpoints["skill.install"], host.skill.install),
+            uninstall: adaptApiMethod(SkillEndpoints["skill.uninstall"], host.skill.uninstall),
+            update: adaptApiMethod(SkillEndpoints["skill.update"], host.skill.update),
+            installed: adaptApiMethod(SkillEndpoints["skill.installed"], host.skill.installed),
+            catalog: adaptApiMethod(SkillEndpoints["skill.catalog"], host.skill.catalog),
             transform: transform(host.skill),
             reload: () => run(host.skill.reload()),
           },

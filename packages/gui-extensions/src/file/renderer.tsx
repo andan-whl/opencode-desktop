@@ -34,7 +34,7 @@ import {
 } from "../sdk"
 import { artifactKind } from "@opencode/util/artifact"
 import { resolveArtifactPath } from "./artifact"
-import { FileContext, type FileShared } from "./context"
+import { FileContext, type FileDraft, type FileShared } from "./context"
 import type { OpenApp } from "./apps"
 import { FileTree, OpenInApp } from "./contract"
 import type File from "./index"
@@ -51,6 +51,10 @@ const TABPANEL = "session-side-panel-file-browser-tabpanel"
 const HANDOFF_SESSIONS = 40
 
 const FILTER_SESSIONS = 40
+
+const DRAFT_ROOTS = 8
+
+const DRAFT_FILES = 20
 
 const DEFAULT_LINE_HEIGHT = 24
 
@@ -69,6 +73,9 @@ const setup: Setup<typeof File> = (ctx) => {
   const [request, setRequest] = createStore<{ app?: OpenApp }>({})
 
   const [filters, setFilters] = createStore<Record<string, { text: string; browsing: boolean } | undefined>>({})
+
+  // The editor's drafts, keyed by workspace root then path, pruned so closed tabs cannot accumulate them.
+  const [drafts, setDrafts] = createStore<Record<string, Record<string, FileDraft | undefined>>>({})
 
   const revealListeners = new Map<string, Set<() => void>>()
   let clickController: AbortController | undefined
@@ -219,6 +226,26 @@ const setup: Setup<typeof File> = (ctx) => {
         revealListeners.get(`${session}\n${path}`)?.forEach((fn) => fn())
       },
     },
+    edit: {
+      get: (root, path) => drafts[root]?.[path],
+      set: (root, path, draft) =>
+        setDrafts(
+          produce((state) => {
+            const files = state[root] ?? {}
+
+            state[root] = files
+            // Deleting first moves the key to the end, so the newest draft is the last to be pruned.
+            delete files[path]
+            files[path] = draft
+
+            const paths = Object.keys(files)
+            paths.slice(0, Math.max(0, paths.length - DRAFT_FILES)).forEach((item) => delete files[item])
+
+            const roots = Object.keys(state)
+            roots.slice(0, Math.max(0, roots.length - DRAFT_ROOTS)).forEach((item) => delete state[item])
+          }),
+        ),
+    },
     active,
     open,
   }
@@ -251,6 +278,8 @@ const setup: Setup<typeof File> = (ctx) => {
       void Tree.preload()
       void List.preload()
       void import("./resolve-link")
+      // The editor's CodeMirror chunk, so the first text file opens without a wait.
+      void import("./editor")
 
       if (layout.narrow()) void MobileFiles.preload()
     }),
@@ -277,15 +306,18 @@ const setup: Setup<typeof File> = (ctx) => {
   const fileTab = (files: Files, id: string): PanelTab => {
     const path = () => fileTabPath(files, id)
     const missing = () => files.missing(path())
+    const dirty = () => shared.edit.get(files.root, path())?.text !== undefined
 
     return {
       id,
       get title() {
         const name = getFilename(path())
 
-        return missing() ? ctx.t("tab.notFound", { name }) : name
+        if (missing()) return ctx.t("tab.notFound", { name })
+
+        return dirty() ? ctx.t("tab.dirty", { name }) : name
       },
-      label: (state) => <FileVisual path={path()} temporary={state.preview} notFound={missing()} />,
+      label: (state) => <FileVisual path={path()} temporary={state.preview} notFound={missing()} dirty={dirty} />,
       get missing() {
         return missing()
       },

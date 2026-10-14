@@ -29,8 +29,6 @@ export function mount(input: {
   ssh?: string | null
   storage?: string | null
   hold?: string | null
-  /** Enables the updater Ipc; check and install reject with this message, which may be empty. */
-  updater?: string | null
 }) {
   const root = document.getElementById("root")
 
@@ -176,7 +174,6 @@ export function mount(input: {
     const bridge: Bridge = {
       packaged: false,
       async call(request) {
-        if (request.ipc === "updater" && input.updater != null) throw new Error(input.updater)
         const method = methods.get(request.ipc)?.[request.method]
 
         if (!method) throw new Error("Unexpected fixture action")
@@ -187,8 +184,6 @@ export function mount(input: {
         return result ?? null
       },
       async subscribe(ipc) {
-        if (ipc === "updater" && input.updater != null) return { available: true, state: { status: "idle" } }
-
         if (ipc === "wsl" || ipc === "ssh") return { available: true, state: snapshot(ipc) }
 
         return { available: false }

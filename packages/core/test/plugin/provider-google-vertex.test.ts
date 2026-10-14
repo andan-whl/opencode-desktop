@@ -49,13 +49,13 @@ describe("GoogleVertexPlugin", () => {
       yield* catalog.transform((catalog) =>
         catalog.update(Provider.ID.opencode, (provider) => {
           provider.package = "@opencode/ai/providers/openai-compatible"
-          provider.settings = { ...provider.settings, baseURL: "https://opencode.ai/zen/v1" }
+          provider.settings = { ...provider.settings, baseURL: "https://api.example.com/v1" }
         }),
       )
       yield* addPlugin()
 
       const provider = required(yield* catalog.get(Provider.ID.opencode))
-      expect(provider.settings).toEqual({ baseURL: "https://opencode.ai/zen/v1" })
+      expect(provider.settings).toEqual({ baseURL: "https://api.example.com/v1" })
     }),
   )
 

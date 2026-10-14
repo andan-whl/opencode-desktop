@@ -24,12 +24,7 @@ import { createMenuDismissController } from "@/shell/commands/menu-dismiss"
 import { createEventListener } from "@solid-primitives/event-listener"
 import { matchesModelSearch } from "./search"
 import { SettingsList } from "@/settings/list"
-import {
-  CONSOLE_GROUP_KEY,
-  consoleModelGroup,
-  ProviderModelIcon,
-  ProviderModelSections,
-} from "@/providers/models/provider-group"
+import { ProviderModelIcon, ProviderModelSections } from "@/providers/models/provider-group"
 import "@/settings/settings.css"
 import "./select-dialog.css"
 
@@ -38,9 +33,6 @@ const MobilePanelDrawer = lazy(async () => {
 
   return { default: MobilePanelDrawer }
 })
-
-const isFree = (provider: string, cost: { input: number } | undefined) =>
-  provider === "opencode" && (!cost || cost.input === 0)
 
 type ModelState = ModelSelection
 
@@ -97,14 +89,9 @@ const ModelList: Component<{
   )
   const models = createMemo(() => controller.models(store.search))
   const modelGroups = createMemo(() => controller.groups(models()))
-  const managed = createMemo(() => consoleModelGroup(controller.all()))
   const expanded = (provider: string) => store.search.length > 0 || !store.collapsed[provider]
-  const managedIDs = createMemo(() => new Set(managed()?.providers.map((provider) => provider.id) ?? []))
 
-  const visibleModels = () =>
-    models().filter(
-      (item) => expanded(item.provider.id) && (!managedIDs().has(item.provider.id) || expanded(CONSOLE_GROUP_KEY)),
-    )
+  const visibleModels = () => models().filter((item) => expanded(item.provider.id))
 
   let scrollRef: HTMLDivElement | undefined
 
@@ -156,15 +143,10 @@ const ModelList: Component<{
                     placement="right-start"
                     gutter={12}
                     openDelay={0}
-                    value={
-                      <ModelTooltip model={item} latest={item.latest} free={isFree(item.provider.id, item.cost)} v2 />
-                    }
+                    value={<ModelTooltip model={item} latest={item.latest} v2 />}
                   >
                     <span class="min-w-0 truncate">{item.name}</span>
                   </Tooltip>
-                  <Show when={isFree(item.provider.id, item.cost)}>
-                    <Badge class="shrink-0">{language.t("model.tag.free")}</Badge>
-                  </Show>
                   <Show when={item.latest}>
                     <Badge class="shrink-0">{language.t("model.tag.latest")}</Badge>
                   </Show>
@@ -238,7 +220,6 @@ const ModelList: Component<{
           >
             <ProviderModelSections
               groups={modelGroups()}
-              managed={managed()}
               expanded={expanded}
               disabled={store.search.length > 0}
               onExpandedChange={(key, value) => setStore("collapsed", key, !value)}
@@ -461,7 +442,6 @@ function createModelSelectorController(input: {
   )
 
   return {
-    all: () => model.list().filter((item) => (input.provider() ? item.provider.id === input.provider() : true)),
     models: (search: string) => {
       const query = search.trim()
 
@@ -688,14 +668,7 @@ export function ModelSelectorPopoverView(props: {
                               placement="right-start"
                               gutter={6}
                               openDelay={0}
-                              value={
-                                <ModelTooltip
-                                  model={item}
-                                  latest={item.latest}
-                                  free={isFree(item.provider.id, item.cost)}
-                                  v2
-                                />
-                              }
+                              value={<ModelTooltip model={item} latest={item.latest} v2 />}
                             >
                               <Menu.RadioItem
                                 value={modelKey(item)}
@@ -710,9 +683,6 @@ export function ModelSelectorPopoverView(props: {
                                 onSelect={() => selectModel(item)}
                               >
                                 <span class="min-w-0 truncate leading-5">{item.name}</span>
-                                <Show when={isFree(item.provider.id, item.cost)}>
-                                  <Badge class="shrink-0">{language.t("model.tag.free")}</Badge>
-                                </Show>
                                 <Show when={item.latest}>
                                   <Badge class="shrink-0">{language.t("model.tag.latest")}</Badge>
                                 </Show>

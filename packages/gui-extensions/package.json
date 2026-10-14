@@ -10,8 +10,7 @@
     "./main": "./src/main.ts",
     "./sdk": "./src/sdk/index.ts",
     "./sdk/main": "./src/sdk/main.ts",
-    "./sdk/bridge": "./src/sdk/bridge.ts",
-    "./updater": "./src/updater/contract.ts"
+    "./sdk/bridge": "./src/sdk/bridge.ts"
   },
   "scripts": {
     "typecheck": "tsgo -b",
@@ -22,11 +21,23 @@
     "@betteroffice/fonts": "0.4.0",
     "@betteroffice/pptx": "0.2.0",
     "@betteroffice/xlsx": "0.3.0",
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/lang-css": "6.3.1",
+    "@codemirror/lang-html": "6.4.12",
+    "@codemirror/lang-javascript": "6.2.5",
+    "@codemirror/lang-json": "6.0.2",
+    "@codemirror/lang-markdown": "6.5.2",
+    "@codemirror/lang-python": "6.2.1",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/search": "6.7.2",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.14",
     "@dnd-kit/abstract": "0.5.0",
     "@dnd-kit/dom": "0.5.0",
     "@dnd-kit/solid": "0.5.0",
     "@effect/platform-node": "catalog:",
     "@kobalte/core": "catalog:",
+    "@lezer/highlight": "1.2.5",
     "@opencode/client": "workspace:*",
     "@opencode/plugin-browser": "workspace:*",
     "@opencode/schema": "workspace:*",
@@ -58,7 +69,6 @@
     "@typescript/native-preview": "catalog:",
     "devtools-protocol": "0.0.1687809",
     "electron": "44.4.5",
-    "electron-updater": "6.8.9",
     "lighthouse": "13.4.1",
     "vite": "catalog:"
   }

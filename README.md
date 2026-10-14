@@ -1,129 +1,142 @@
-<p align="center">
-  <a href="https://opencode.ai">
-    <picture>
-      <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="OpenCode logo">
-    </picture>
-  </a>
-</p>
-<p align="center">The open source AI coding agent.</p>
-<p align="center">
-  <a href="https://opencode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/@opencode/cli"><img alt="npm" src="https://img.shields.io/npm/v/@opencode/cli?style=flat-square" /></a>
-  <a href="https://github.com/anomalyco/opencode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/publish.yml?style=flat-square&branch=dev" /></a>
-</p>
+# OpenCodeDesktop
 
-<p align="center">
-  <a href="README.md">English</a> |
-  <a href="README.zh.md">简体中文</a> |
-  <a href="README.zht.md">繁體中文</a> |
-  <a href="README.ko.md">한국어</a> |
-  <a href="README.de.md">Deutsch</a> |
-  <a href="README.es.md">Español</a> |
-  <a href="README.fr.md">Français</a> |
-  <a href="README.it.md">Italiano</a> |
-  <a href="README.da.md">Dansk</a> |
-  <a href="README.ja.md">日本語</a> |
-  <a href="README.pl.md">Polski</a> |
-  <a href="README.ru.md">Русский</a> |
-  <a href="README.bs.md">Bosanski</a> |
-  <a href="README.ar.md">العربية</a> |
-  <a href="README.no.md">Norsk</a> |
-  <a href="README.br.md">Português (Brasil)</a> |
-  <a href="README.th.md">ไทย</a> |
-  <a href="README.tr.md">Türkçe</a> |
-  <a href="README.uk.md">Українська</a> |
-  <a href="README.bn.md">বাংলা</a> |
-  <a href="README.gr.md">Ελληνικά</a> |
-  <a href="README.vi.md">Tiếng Việt</a>
-</p>
+**OpenCodeDesktop** is a personal AI coding assistant client — a privacy-first fork of [opencode](https://github.com/sst/opencode), the open source AI coding agent by SST/Anomaly Innovations.
 
-[![OpenCode Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://opencode.ai)
+This fork keeps opencode's full agent engineering stack and desktop client, but removes everything that phones home. Your API keys, prompts, and code never leave your machine.
 
----
+[English](./README.md) | [简体中文](./README.zh.md)
 
-### Installation
+## What this fork changes
+
+Removed from the upstream codebase:
+
+- Cloud gateway — the client talks straight to model providers.
+- Telemetry and Sentry reporting — nothing is collected or sent.
+- Automatic update checks — versions change only when you rebuild.
+- Remote tunnels — no way to expose a session from outside.
+
+Kept from upstream:
+
+- The complete agent runtime: sessions, tool calls, permission control, MCP servers, and agent configuration.
+- The desktop client and the terminal UI, driven by the same local server.
+
+## Features
+
+- **Privacy first** — with the gateway, telemetry, update checks, and tunnels gone, provider credentials and all session data stay on your machine.
+- **Full agent engineering** — sessions, tool calls, permission control, MCP servers, and configurable agents are all intact.
+- **40+ model providers** — OpenAI, Anthropic, Google, and more, plus local models through ollama and lmstudio. Switch freely per session or agent.
+- **Skill system** — install skills from four kinds of sources:
+  - a local path
+  - a URL
+  - a git repository
+  - the built-in catalog
+
+  Managed from both the CLI (`opencode skill add/list/update/remove`) and the GUI (Settings → Skills).
+- **Desktop client** — three-pane layout:
+  - left: file tree
+  - center: CodeMirror editor (Ctrl+S to save, dirty-state markers) with a terminal dock at the bottom
+  - right: AI session window
+- **TUI** — the full terminal interface, straight from the CLI.
+- **Windows installer** — a local electron-builder NSIS x64 package, unsigned, with no auto-update or remote publishing.
+
+## Quick start
+
+Prerequisites: [Bun](https://bun.com) (the repository pins `bun@1.4.x`).
 
 ```bash
-# YOLO
-curl -fsSL https://opencode.ai/install | bash
-
-# Package managers
-npm i -g @opencode/cli@latest      # or bun/pnpm/yarn
-scoop install opencode             # Windows
-choco install opencode             # Windows
-brew install anomalyco/tap/opencode # macOS and Linux (recommended, always up to date)
-brew install opencode              # macOS and Linux (official brew formula, updated less)
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-bin               # Arch Linux (Latest from AUR)
-mise use -g opencode               # Any OS
-nix run nixpkgs#opencode           # or github:anomalyco/opencode for latest dev branch
+bun install
 ```
 
-> [!TIP]
-> Remove versions older than 0.1.x before installing.
-
-### Desktop App (BETA)
-
-OpenCode is also available as a desktop application. Download directly from the [releases page](https://github.com/anomalyco/opencode/releases) or [opencode.ai/download](https://opencode.ai/download).
-
-| Platform              | Download                           |
-| --------------------- | ---------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
-| Windows               | `opencode-desktop-windows-x64.exe` |
-| Linux                 | `.deb`, `.rpm`, or `.AppImage`     |
+Run the TUI in development:
 
 ```bash
-# macOS (Homebrew)
-brew install --cask opencode-desktop
-# Windows (Scoop)
-scoop bucket add extras; scoop install extras/opencode-desktop
+bun run dev
 ```
 
-#### Installation Directory
-
-The install script respects the following priority order for the installation path:
-
-1. `$OPENCODE_INSTALL_DIR` - Custom installation directory
-2. `$XDG_BIN_DIR` - XDG Base Directory Specification compliant path
-3. `$HOME/bin` - Standard user binary directory (if it exists or can be created)
-4. `$HOME/.opencode/bin` - Default fallback
+Run the desktop client in development:
 
 ```bash
-# Examples
-OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/install | bash
+bun run dev:desktop
 ```
 
-### Agents
+The desktop dev script spins up its own isolated local server against the CLI source, with live reload in the renderer.
 
-OpenCode includes two built-in agents you can switch between with the `Tab` key.
+Attach the development TUI to the installed background server instead of its own:
 
-- **build** - Default, full-access agent for development work
-- **plan** - Read-only agent for analysis and code exploration
-  - Denies file edits by default
-  - Asks permission before running bash commands
-  - Ideal for exploring unfamiliar codebases or planning changes
+```bash
+bun run dev:live
+```
 
-Also included is a **general** subagent for complex searches and multistep tasks.
-This is used internally and can be invoked using `@general` in messages.
+Lint and type-check the whole repository:
 
-Learn more about [agents](https://opencode.ai/docs/agents).
+```bash
+bun run check
+```
 
-### Documentation
+For faster iteration inside a single package, run `bun typecheck` in that package instead.
 
-For more info on how to configure OpenCode, [**head over to our docs**](https://opencode.ai/docs).
+Tests run from package directories, not from the repository root:
 
-### Contributing
+```bash
+bun test # e.g. inside packages/core
+```
 
-If you're interested in contributing to OpenCode, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
+## Building the Windows installer
 
-### Building on OpenCode
+The installer bundles a locally built `opencode` CLI into the Electron app, so build the CLI first, then package the desktop. Run `bun install` at the repository root before starting.
 
-If you are working on a project that's related to OpenCode and is using "opencode" as part of its name, for example "opencode-dashboard" or "opencode-mobile", please add a note to your README to clarify that it is not built by the OpenCode team and is not affiliated with us in any way.
+### 1. Build the CLI
 
----
+From `packages/cli`:
 
-**Join our community** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)
+```bash
+bun run build --single --baseline
+```
+
+`--single` limits the build to the current OS and architecture; `--baseline` also emits the baseline (non-AVX2) Windows variant that the desktop bundles on x64. On a Windows x64 host this produces both `cli-windows-x64` and `cli-windows-x64-baseline` under `dist/`. Alternatively, build exactly the target the desktop needs:
+
+```bash
+bun run build --target=opencode-windows-x64-baseline
+```
+
+The executable lands under `packages/cli/dist/<target>/bin/opencode.exe` — for example `packages/cli/dist/cli-windows-x64-baseline/bin/opencode.exe`. The build compiles a single self-contained executable, so the app ships no separate runtime.
+
+### 2. Package the desktop
+
+From `packages/desktop` (PowerShell):
+
+```powershell
+$env:OPENCODE_CHANNEL = "prod"
+$env:OPENCODE_CLI_DIST = "D:\path\to\this\repo\packages\cli\dist"
+bun run build
+bun run package:win
+```
+
+`OPENCODE_CLI_DIST` must point at the CLI `dist` directory: the prod prebuild expects `cli-windows-x64-baseline/bin/opencode.exe` inside it and copies that binary into the app resources. The build fails fast if it is missing.
+
+The result is an unsigned NSIS installer at `packages/desktop/dist/OpenCodeDesktop-win-x64.exe`. Everything happens locally — no code signing, no publishing step.
+
+## Repository layout
+
+| Package | Purpose |
+| --- | --- |
+| `packages/core` | Agent engine: sessions, tools, permissions, model providers, agent configuration |
+| `packages/server` | HTTP server exposing the core over the API |
+| `packages/protocol` | Public API and event protocol definitions |
+| `packages/schema` | Shared schema and type definitions |
+| `packages/client` | Generated API client used by the TUI, desktop, and plugins |
+| `packages/cli` | The `opencode` CLI: commands, entrypoint, and executable build |
+| `packages/tui` | Terminal UI |
+| `packages/app` | SolidJS web app that powers the desktop renderer |
+| `packages/desktop` | Electron desktop shell and installer packaging |
+| `packages/ui` | Shared SolidJS UI components |
+| `packages/gui-extensions` | Editor and document GUI extensions embedded in the desktop renderer |
+| `packages/plugin` | Plugin definitions and runtime for extensions |
+| `packages/util` | Shared utilities |
+| `packages/sdk` | Composes client, core, and server for programmatic use |
+
+## Acknowledgements & license
+
+OpenCodeDesktop is a derivative work of [opencode](https://github.com/sst/opencode) by SST/Anomaly Innovations. Many thanks to the opencode team and its contributors for the agent engine, TUI, and desktop app this fork builds on.
+
+Licensed under the [MIT License](./LICENSE), as is the upstream project.

@@ -13,9 +13,9 @@ import { CLI_BINARIES, nodePtyPackage } from "./scripts/utils"
 const { FileMatcher } = createRequire(import.meta.resolve("electron-builder"))("app-builder-lib/out/fileMatcher")
 
 const channels = [
-  { channel: "dev", appId: "ai.opencode.desktop.dev" },
-  { channel: "beta", appId: "ai.opencode.desktop.beta" },
-  { channel: "prod", appId: "ai.opencode.desktop" },
+  { channel: "dev", appId: "com.opencodedesktop.app.dev" },
+  { channel: "beta", appId: "com.opencodedesktop.app.beta" },
+  { channel: "prod", appId: "com.opencodedesktop.app" },
 ] as const
 
 function load(channel: string, target?: string): Configuration {
@@ -56,18 +56,7 @@ test.each(channels)("channel identity for $channel", ({ channel, appId }) => {
 
   for (const fpm of [config.deb?.fpm, config.rpm?.fpm]) {
     expect(fpm).toContainEqual(expect.stringContaining(`/usr/share/metainfo/${appId}.metainfo.xml`))
-    expect(
-      fpm?.some((entry) => entry.endsWith("opencode-desktop.desktop=/usr/share/applications/opencode-desktop.desktop")),
-    ).toBe(channel === "prod")
   }
-})
-
-test("legacy Linux launcher stays hidden", async () => {
-  const desktop = await Bun.file(path.join(import.meta.dirname, "resources/linux/opencode-desktop.desktop")).text()
-  expect(desktop).toContain("Exec=/opt/OpenCode/ai.opencode.desktop %U")
-  expect(desktop).toContain("Icon=ai.opencode.desktop")
-  expect(desktop).toContain("StartupWMClass=ai.opencode.desktop")
-  expect(desktop).toContain("NoDisplay=true")
 })
 
 test("shared packaging defaults", async () => {
@@ -114,11 +103,6 @@ test("trims external dependencies without excluding runtime files", () => {
     for (const file of [
       "@zip.js/zip.js/index.js",
       "@zip.js/zip.js/lib/z-worker-inline.js",
-      "electron-updater/out/main.js",
-      "electron-updater/out/MacUpdater.js",
-      "electron-updater/out/NsisUpdater.js",
-      "electron-updater/out/providers/GitHubProvider.js",
-      "builder-util-runtime/out/httpExecutor.js",
       "ajv/dist/ajv.js",
       "ajv/dist/refs/json-schema-draft-07.json",
       "ajv-formats/dist/formats.js",
@@ -128,7 +112,7 @@ test("trims external dependencies without excluding runtime files", () => {
       "unrelated/dist/index.cjs",
       "unrelated/dist/data.json",
       "unrelated/src/index.ts",
-      ...["@zip.js/zip.js", "electron-updater", "builder-util-runtime", "ajv", "ajv-formats", "js-yaml"].flatMap(
+      ...["@zip.js/zip.js", "ajv", "ajv-formats", "js-yaml"].flatMap(
         (name) => [`${name}/package.json`, `${name}/LICENSE`],
       ),
     ]) {

@@ -154,8 +154,6 @@ export type Config = {
   small_model?: string
   default_agent?: string
   username?: string
-  share?: "manual" | "auto" | "disabled"
-  autoshare?: boolean
   shell?: string
   plugin?: Array<string | [string, Record<string, unknown>]>
   provider?: Record<string, { npm?: string; models?: Record<string, unknown> }>

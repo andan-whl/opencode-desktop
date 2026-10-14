@@ -13,8 +13,6 @@ export type WorkspaceDefaultDestination = Settings["workspaces"]["defaultDestina
 
 export type WorkspaceLastUsed = Settings["workspaces"]["lastUsed"][string]
 
-export type TerminalPlacement = Settings["general"]["terminalPlacement"]
-
 export type FollowUpBehavior = Settings["general"]["followUpBehavior"]
 
 export type TabLayout = Settings["appearance"]["tabLayout"]
@@ -101,7 +99,6 @@ const placementOnlySchema = Persistence.struct({ placement: placementSchema })
 const generalSchema = Persistence.struct({
   // Retired preferences without readers; kept so stored values still decode and round-trip.
   autoSave: Persistence.optional(Schema.Boolean),
-  // Owned by the updater extension, which copies it out once; kept so settings rewrites cannot drop it first.
   releaseNotes: Persistence.optional(Schema.Boolean),
   showFileTree: Schema.Boolean,
   showNavigation: Persistence.optional(Schema.Boolean),
@@ -119,7 +116,6 @@ const generalSchema = Persistence.struct({
   mobileTitlebarPosition: Schema.Literals(["top", "bottom"]),
   // Owned by the review extension, which copies it out once; kept so settings rewrites cannot drop it first.
   mobileDiffWrap: Persistence.optional(Schema.Boolean),
-  terminalPlacement: Schema.Literals(["side", "bottom"]),
   followUpBehavior: Schema.Literals(["queue", "steer"]),
 })
 
@@ -279,7 +275,6 @@ export const defaultSettings: Settings = {
     timelineDetail: { ...timelinePresets[2].value },
     showCustomAgents: false,
     mobileTitlebarPosition: "top",
-    terminalPlacement: "side",
     followUpBehavior: "steer",
   },
   appearance: { fontSize: 14, mono: "", sans: "", terminal: "", tabLayout: "horizontal" },
@@ -357,13 +352,6 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         ),
         setMobileTitlebarPosition(value: "top" | "bottom") {
           setStore("general", "mobileTitlebarPosition", value)
-        },
-        terminalPlacement: withFallback(
-          () => store.general?.terminalPlacement,
-          defaultSettings.general.terminalPlacement,
-        ),
-        setTerminalPlacement(value: TerminalPlacement) {
-          setStore("general", "terminalPlacement", value)
         },
         followUpBehavior: withFallback(() => store.general?.followUpBehavior, defaultSettings.general.followUpBehavior),
         setFollowUpBehavior(value: FollowUpBehavior) {

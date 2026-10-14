@@ -40,7 +40,6 @@
   "devDependencies": {
     "@happy-dom/global-registrator": "20.0.11",
     "@playwright/test": "catalog:",
-    "@sentry/vite-plugin": "catalog:",
     "@tailwindcss/vite": "4.3.3",
     "@types/bun": "catalog:",
     "@types/node": "catalog:",
@@ -68,7 +67,6 @@
     "@opencode/ui": "workspace:*",
     "@opencode/util": "workspace:*",
     "@pierre/trees": "1.0.0-beta.4",
-    "@sentry/solid": "catalog:",
     "@solid-primitives/event-bus": "1.1.2",
     "@solid-primitives/event-listener": "catalog:",
     "@solid-primitives/i18n": "2.2.1",

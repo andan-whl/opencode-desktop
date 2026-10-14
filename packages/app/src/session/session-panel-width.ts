@@ -1,15 +1,16 @@
-// The review pane has no width of its own: it takes whatever the chat panel
-// leaves behind. Instead of capping the chat panel at a fraction of the window
-// (which forces the review pane to grow with the monitor), reserve a fixed
-// minimum for the review pane and let the chat panel take everything else.
+// The middle editor column has no width of its own: it takes whatever the
+// chat column leaves behind. Instead of capping the chat column at a fraction
+// of the window (which forces the editor column to grow with the monitor),
+// reserve a fixed minimum for the editor column and let the chat column take
+// everything else.
 export const SESSION_PANEL_WIDTH_MIN = 450
 
-const REVIEW_PANE_WIDTH_MIN = 480
+const EDITOR_PANE_WIDTH_MIN = 480
 
-const REVIEW_PANE_WIDTH_MIN_SPLIT = 800
+const EDITOR_PANE_WIDTH_MIN_SPLIT = 800
 
 export function sessionPanelWidthMax(input: { available: number; split: boolean }) {
-  const pane = input.split ? REVIEW_PANE_WIDTH_MIN_SPLIT : REVIEW_PANE_WIDTH_MIN
+  const pane = input.split ? EDITOR_PANE_WIDTH_MIN_SPLIT : EDITOR_PANE_WIDTH_MIN
 
   return Math.max(SESSION_PANEL_WIDTH_MIN, input.available - pane)
 }

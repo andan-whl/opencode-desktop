@@ -94,7 +94,6 @@ describe("settings schema", () => {
         timelineDetail: timelinePresets[2].value,
         showCustomAgents: false,
         mobileTitlebarPosition: "top",
-        terminalPlacement: "side",
         followUpBehavior: "steer",
       },
       appearance: {

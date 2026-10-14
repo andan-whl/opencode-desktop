@@ -19,6 +19,7 @@ import { Session } from "@opencode/core/session"
 import { Instance } from "@opencode/core/instance/service"
 import { SessionTransfer } from "@opencode/core/session/transfer"
 import { ShellSelect } from "@opencode/core/shell/select"
+import { SkillCatalog } from "@opencode/core/skill/catalog"
 import { Job } from "@opencode/core/job"
 import { Mcp } from "@opencode/core/mcp/index"
 import { Global } from "@opencode/util/global"
@@ -75,6 +76,7 @@ const applicationServiceNodes = [
   LocationActivity.node,
   SessionRestart.node,
   Workspace.node,
+  SkillCatalog.node,
 ] as const
 const applicationServices = LayerNode.group(applicationServiceNodes)
 

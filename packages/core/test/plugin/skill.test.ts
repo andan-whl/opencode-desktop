@@ -27,6 +27,11 @@ describe("SkillPlugin.Plugin", () => {
           app: { name: "test", version: "1.2.3", channel: "beta" },
           skill: {
             list: () => Effect.die("unused skill.list"),
+            install: () => Effect.die("unused skill.install"),
+            uninstall: () => Effect.die("unused skill.uninstall"),
+            update: () => Effect.die("unused skill.update"),
+            installed: () => Effect.die("unused skill.installed"),
+            catalog: () => Effect.die("unused skill.catalog"),
             transform: skill.transform,
             reload: skill.reload,
           },
@@ -61,6 +66,11 @@ describe("SkillPlugin.Plugin", () => {
         host({
           skill: {
             list: () => Effect.die("unused skill.list"),
+            install: () => Effect.die("unused skill.install"),
+            uninstall: () => Effect.die("unused skill.uninstall"),
+            update: () => Effect.die("unused skill.update"),
+            installed: () => Effect.die("unused skill.installed"),
+            catalog: () => Effect.die("unused skill.catalog"),
             transform: skill.transform,
             reload: skill.reload,
           },

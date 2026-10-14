@@ -63,8 +63,10 @@ function previewBuildNumber() {
 const bot = ["actions-user", "opencode", "opencode-agent[bot]"]
 const teamPath = path.resolve(import.meta.dir, "../../../.github/TEAM_MEMBERS")
 const team = [
+  // The fork removed .github/, so the upstream team list is optional here.
   ...(await Bun.file(teamPath)
     .text()
+    .catch(() => "")
     .then((x) => x.split(/\r?\n/).map((x) => x.trim()))
     .then((x) => x.filter((x) => x && !x.startsWith("#")))),
   ...bot,

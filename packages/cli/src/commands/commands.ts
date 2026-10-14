@@ -1,7 +1,6 @@
 import { Argument, Flag, GlobalFlag } from "effect/cli"
 import { Schema } from "effect"
 import { Spec } from "../framework/spec"
-import { Updater } from "../services/updater"
 
 export const PrintLogs = GlobalFlag.Setting("print-logs")({
   flag: Flag.Boolean("print-logs").pipe(
@@ -57,21 +56,6 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
     prompt: Flag.String("prompt").pipe(Flag.withDescription("Prompt to use"), Flag.optional),
   },
   commands: [
-    Spec.make("upgrade", {
-      description: "Upgrade OpenCode to the latest or a specific version",
-      aliases: ["update"],
-      params: {
-        target: Argument.String("target").pipe(
-          Argument.withDescription("Version to upgrade to (with or without a leading v)"),
-          Argument.optional,
-        ),
-        method: Flag.Literals("method", Updater.methods).pipe(
-          Flag.withAlias("m"),
-          Flag.withDescription("Installation method to use"),
-          Flag.optional,
-        ),
-      },
-    }),
     Spec.make("uninstall", {
       description: "Uninstall OpenCode, keeping session data, configuration, and state",
       params: {
@@ -298,6 +282,38 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
           description: "Remove a plugin from global configuration",
           params: {
             package: Argument.String("package").pipe(Argument.withDescription("configured package specifier")),
+          },
+        }),
+      ],
+    }),
+    Spec.make("skill", {
+      description: "Manage skills",
+      commands: [
+        Spec.make("list", {
+          description: "List installed and discovered skills",
+        }),
+        Spec.make("add", {
+          description: "Install a skill from a local path, URL, git repository, or catalog entry",
+          params: {
+            source: Argument.String("source").pipe(
+              Argument.withDescription("Local path, URL, git repository, or catalog entry name"),
+              Argument.optional,
+            ),
+          },
+        }),
+        Spec.make("update", {
+          description: "Update installed skills from their recorded sources",
+          params: {
+            name: Argument.String("name").pipe(
+              Argument.withDescription("Installed skill name; omit to update every managed skill"),
+              Argument.optional,
+            ),
+          },
+        }),
+        Spec.make("remove", {
+          description: "Remove an installed skill",
+          params: {
+            name: Argument.String("name").pipe(Argument.withDescription("Name of the installed skill")),
           },
         }),
       ],
@@ -531,19 +547,6 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
             () => "Expected an HTTP(S) server URL without credentials, query parameters, or a fragment",
           ),
           Flag.optional,
-        ),
-        remote: Flag.Boolean("remote").pipe(
-          Flag.withDescription(
-            "Pair through the OpenTunnel remote address, enabling remote access if needed (exposes the server to the internet)",
-          ),
-          Flag.withDefault(false),
-        ),
-        yes: Flag.Boolean("yes").pipe(
-          Flag.withAlias("y"),
-          Flag.withDescription(
-            "Accept exposing the server to the internet when --remote enables remote access for the first time (required without an interactive terminal)",
-          ),
-          Flag.withDefault(false),
         ),
       },
     }),

@@ -192,6 +192,16 @@ import type {
   CommandListOutput,
   SkillListInput,
   SkillListOutput,
+  SkillInstallInput,
+  SkillInstallOutput,
+  SkillUninstallInput,
+  SkillUninstallOutput,
+  SkillUpdateInput,
+  SkillUpdateOutput,
+  SkillInstalledInput,
+  SkillInstalledOutput,
+  SkillCatalogInput,
+  SkillCatalogOutput,
   RpcCallInput,
   RpcCallOutput,
   EventSubscribeOutput,
@@ -1226,7 +1236,46 @@ const EndpointSkillList = (raw: RawClient["server.skill"]) => (input?: SkillList
     raw["skill.list"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
   )
 
-const adaptGroupSkill = (raw: RawClient["server.skill"]) => ({ list: EndpointSkillList(raw) })
+const EndpointSkillInstall = (raw: RawClient["server.skill"]) => (input: SkillInstallInput) =>
+  preserveEffect<SkillInstallOutput>()(
+    raw["skill.install"]({
+      query: { location: input["location"] },
+      payload: { type: input["type"], ref: input["ref"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSkillUninstall = (raw: RawClient["server.skill"]) => (input: SkillUninstallInput) =>
+  preserveEffect<SkillUninstallOutput>()(
+    raw["skill.uninstall"]({ query: { location: input["location"] }, payload: { name: input["name"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointSkillUpdate = (raw: RawClient["server.skill"]) => (input?: SkillUpdateInput) =>
+  preserveEffect<SkillUpdateOutput>()(
+    raw["skill.update"]({ query: { location: input?.["location"] }, payload: { name: input?.["name"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointSkillInstalled = (raw: RawClient["server.skill"]) => (input?: SkillInstalledInput) =>
+  preserveEffect<SkillInstalledOutput>()(
+    raw["skill.installed"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSkillCatalog = (raw: RawClient["server.skill"]) => (input?: SkillCatalogInput) =>
+  preserveEffect<SkillCatalogOutput>()(
+    raw["skill.catalog"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const adaptGroupSkill = (raw: RawClient["server.skill"]) => ({
+  list: EndpointSkillList(raw),
+  install: EndpointSkillInstall(raw),
+  uninstall: EndpointSkillUninstall(raw),
+  update: EndpointSkillUpdate(raw),
+  installed: EndpointSkillInstalled(raw),
+  catalog: EndpointSkillCatalog(raw),
+})
 
 const EndpointRpcCall = (raw: RawClient["server.rpc"]) => (input: RpcCallInput) =>
   preserveEffect<RpcCallOutput>()(

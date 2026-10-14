@@ -55,7 +55,7 @@ export function Logo() {
         <For each={go.right.slice(1)}>
           {(line) => <box flexDirection="row">{renderLine(line, theme.text.base, true)}</box>}
         </For>
-      ) : dimensions().width < 44 ? (
+      ) : dimensions().width < 52 ? (
         <>
           <For each={logo.left.slice(1)}>
             {(line) => <box flexDirection="row">{renderLine(line, theme.text.muted, false)}</box>}
@@ -70,6 +70,11 @@ export function Logo() {
             <box flexDirection="row" gap={1}>
               <box flexDirection="row">{renderLine(line, theme.text.muted, false)}</box>
               <box flexDirection="row">{renderLine(logo.right[index()], theme.text.base, true)}</box>
+              {index() === 2 ? (
+                <text fg={theme.text.base} attributes={TextAttributes.BOLD} selectable={false}>
+                  desktop
+                </text>
+              ) : null}
             </box>
           )}
         </For>

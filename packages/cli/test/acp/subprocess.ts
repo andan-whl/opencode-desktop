@@ -84,7 +84,6 @@ export async function createAcpFixture(
           USERPROFILE: root,
           OPENCODE_CONFIG: undefined,
           OPENCODE_CONFIG_CONTENT: undefined,
-          OPENCODE_DISABLE_AUTOUPDATE: "true",
           OPENCODE_MODELS_PATH: models,
         }),
       })
@@ -161,7 +160,6 @@ function verifierConfig(llmUrl: string) {
     limit: { context: 100_000, output: 10_000 },
   }
   return {
-    update: "disable",
     model: "test/test-model",
     providers: {
       test: {

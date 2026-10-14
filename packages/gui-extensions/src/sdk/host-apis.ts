@@ -726,12 +726,6 @@ export interface Layout {
      * @param session - Any session.
      */
     opened(session: SessionRef): boolean
-    /**
-     * Where the user placed the dock; `side`, the setting's default, before the app interface mounts. Reactive.
-     * - `side`: beside the timeline.
-     * - `bottom`: below the timeline.
-     */
-    placement(): "side" | "bottom"
   }
   /** Scroll offsets the host stores per session and key. */
   readonly scroll: {

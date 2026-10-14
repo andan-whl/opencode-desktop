@@ -190,6 +190,16 @@ import type {
   CommandListOutput,
   SkillListInput,
   SkillListOutput,
+  SkillInstallInput,
+  SkillInstallOutput,
+  SkillUninstallInput,
+  SkillUninstallOutput,
+  SkillUpdateInput,
+  SkillUpdateOutput,
+  SkillInstalledInput,
+  SkillInstalledOutput,
+  SkillCatalogInput,
+  SkillCatalogOutput,
   RpcCallInput,
   RpcCallOutput,
   EventSubscribeOutput,
@@ -1686,6 +1696,69 @@ export function make(options: ClientOptions) {
           {
             method: "GET",
             path: `/api/skill`,
+            query: { location: input?.["location"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      install: (input: SkillInstallInput, requestOptions?: RequestOptions) =>
+        request<SkillInstallOutput>(
+          {
+            method: "POST",
+            path: `/api/skill/install`,
+            query: { location: input["location"] },
+            body: { type: input["type"], ref: input["ref"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      uninstall: (input: SkillUninstallInput, requestOptions?: RequestOptions) =>
+        request<SkillUninstallOutput>(
+          {
+            method: "POST",
+            path: `/api/skill/uninstall`,
+            query: { location: input["location"] },
+            body: { name: input["name"] },
+            successStatus: 204,
+            declaredStatuses: [400, 401, 404, 409],
+            empty: true,
+          },
+          requestOptions,
+        ),
+      update: (input?: SkillUpdateInput, requestOptions?: RequestOptions) =>
+        request<SkillUpdateOutput>(
+          {
+            method: "POST",
+            path: `/api/skill/update`,
+            query: { location: input?.["location"] },
+            body: { name: input?.["name"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      installed: (input?: SkillInstalledInput, requestOptions?: RequestOptions) =>
+        request<SkillInstalledOutput>(
+          {
+            method: "GET",
+            path: `/api/skill/installed`,
+            query: { location: input?.["location"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      catalog: (input?: SkillCatalogInput, requestOptions?: RequestOptions) =>
+        request<SkillCatalogOutput>(
+          {
+            method: "GET",
+            path: `/api/skill/catalog`,
             query: { location: input?.["location"] },
             successStatus: 200,
             declaredStatuses: [400, 401, 404],

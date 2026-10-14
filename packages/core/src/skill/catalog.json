@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "name": "docx",
+      "description": "Create, edit, and analyze Word documents (.docx)",
+      "category": "document",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/docx" }
+    },
+    {
+      "name": "pdf",
+      "description": "Read, create, merge, split, fill, and process PDF files",
+      "category": "document",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/pdf" }
+    },
+    {
+      "name": "pptx",
+      "description": "Create, edit, and analyze PowerPoint presentations (.pptx)",
+      "category": "document",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/pptx" }
+    },
+    {
+      "name": "xlsx",
+      "description": "Create, edit, and analyze spreadsheets (.xlsx, .csv)",
+      "category": "document",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/xlsx" }
+    },
+    {
+      "name": "doc-coauthoring",
+      "description": "Co-author and iteratively refine documents with tracked changes",
+      "category": "document",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/doc-coauthoring" }
+    },
+    {
+      "name": "skill-creator",
+      "description": "Create, improve, and evaluate skills",
+      "category": "meta",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/skill-creator" }
+    },
+    {
+      "name": "mcp-builder",
+      "description": "Build MCP servers that expose external services to LLMs as tools",
+      "category": "development",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/mcp-builder" }
+    },
+    {
+      "name": "frontend-design",
+      "description": "Design and build polished frontend interfaces",
+      "category": "development",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/frontend-design" }
+    },
+    {
+      "name": "web-artifacts-builder",
+      "description": "Build interactive web artifacts and single-page apps",
+      "category": "development",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/web-artifacts-builder" }
+    },
+    {
+      "name": "webapp-testing",
+      "description": "Drive browser-based tests against web apps",
+      "category": "development",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/webapp-testing" }
+    },
+    {
+      "name": "claude-api",
+      "description": "Use the Claude API effectively in code",
+      "category": "development",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/claude-api" }
+    },
+    {
+      "name": "canvas-design",
+      "description": "Create interactive visualizations and animations on an HTML canvas",
+      "category": "design",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/canvas-design" }
+    },
+    {
+      "name": "algorithmic-art",
+      "description": "Create generative art with p5.js",
+      "category": "design",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/algorithmic-art" }
+    },
+    {
+      "name": "brand-guidelines",
+      "description": "Apply brand guidelines and design systems to design work",
+      "category": "design",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/brand-guidelines" }
+    },
+    {
+      "name": "theme-factory",
+      "description": "Create and apply visual themes across projects",
+      "category": "design",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/theme-factory" }
+    },
+    {
+      "name": "internal-comms",
+      "description": "Turn messy thinking into structured internal communications",
+      "category": "communication",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/internal-comms" }
+    },
+    {
+      "name": "slack-gif-creator",
+      "description": "Create animated GIFs for Slack messages",
+      "category": "communication",
+      "source": { "type": "git", "ref": "https://github.com/anthropics/skills#skills/slack-gif-creator" }
+    }
+  ]
+}

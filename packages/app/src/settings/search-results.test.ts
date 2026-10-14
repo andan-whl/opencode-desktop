@@ -75,7 +75,6 @@ describe("settings search index", () => {
         .filter((item) => item.title === "Agent")
         .map((item) => item.page),
     ).toEqual(["Desktop notifications", "Sound effects"])
-    expect(rankSettings("terminal placement", items, root)[0].page).toBe("Preferences / General")
     expect(items.some((item) => item.view.target === "settings-project-startup")).toBe(false)
   })
 

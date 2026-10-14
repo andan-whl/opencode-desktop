@@ -1787,8 +1787,55 @@ export type SkillListInput = { readonly location?: { readonly directory?: string
 export type SkillListOutput = { readonly location: Location.PublicRef; readonly data: ReadonlyArray<Skill.Info> }
 export type SkillListOperation<E = never> = (input?: SkillListInput) => Effect.Effect<SkillListOutput, E>
 
+export type SkillInstallInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly type: "path" | "url" | "git" | "index"
+  readonly ref: string
+}
+export type SkillInstallOutput = {
+  readonly location: Location.PublicRef
+  readonly data: ReadonlyArray<Skill.InstallResult>
+}
+export type SkillInstallOperation<E = never> = (input: SkillInstallInput) => Effect.Effect<SkillInstallOutput, E>
+
+export type SkillUninstallInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly name: Skill.Name
+}
+export type SkillUninstallOutput = void
+export type SkillUninstallOperation<E = never> = (input: SkillUninstallInput) => Effect.Effect<SkillUninstallOutput, E>
+
+export type SkillUpdateInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly name?: Skill.Name | undefined
+}
+export type SkillUpdateOutput = {
+  readonly location: Location.PublicRef
+  readonly data: ReadonlyArray<Skill.InstallResult>
+}
+export type SkillUpdateOperation<E = never> = (input?: SkillUpdateInput) => Effect.Effect<SkillUpdateOutput, E>
+
+export type SkillInstalledInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type SkillInstalledOutput = {
+  readonly location: Location.PublicRef
+  readonly data: ReadonlyArray<Skill.ManifestEntry>
+}
+export type SkillInstalledOperation<E = never> = (input?: SkillInstalledInput) => Effect.Effect<SkillInstalledOutput, E>
+
+export type SkillCatalogInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type SkillCatalogOutput = {
+  readonly location: Location.PublicRef
+  readonly data: ReadonlyArray<Skill.CatalogEntry>
+}
+export type SkillCatalogOperation<E = never> = (input?: SkillCatalogInput) => Effect.Effect<SkillCatalogOutput, E>
+
 export interface SkillApi<E = never> {
   readonly list: SkillListOperation<E>
+  readonly install: SkillInstallOperation<E>
+  readonly uninstall: SkillUninstallOperation<E>
+  readonly update: SkillUpdateOperation<E>
+  readonly installed: SkillInstalledOperation<E>
+  readonly catalog: SkillCatalogOperation<E>
 }
 
 export type RpcCallInput = {

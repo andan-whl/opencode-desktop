@@ -49,7 +49,7 @@ type Run = { readonly value: unknown; readonly generation?: number } | undefined
  * @example
  * ```ts
  * // Each provider generation: listen to its events; the listener ends with the generation.
- * createKeyed(ctx.uses.updater, (updater) => void updater.on("check", () => act("check")))
+ * createKeyed(ctx.uses.pane, (pane) => void pane.on("event", (value) => show(value.event)))
  * // A plain accessor: the picker runs while the tab is visible, and `otherwise` while it is not.
  * createKeyed(visible, startPicker, { otherwise: endPicker })
  * // An object source: lists again only when the directory or the tab changes.

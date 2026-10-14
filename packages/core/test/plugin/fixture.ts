@@ -31,7 +31,9 @@ import { Permission } from "@opencode/core/permission"
 import { Reference } from "@opencode/core/reference"
 import { Rpc } from "@opencode/core/rpc"
 import { Skill } from "@opencode/core/skill"
+import { SkillCatalog } from "@opencode/core/skill/catalog"
 import { SkillDiscovery } from "@opencode/core/skill/discovery"
+import { SkillInstall } from "@opencode/core/skill/install"
 import { Watcher } from "@opencode/core/filesystem/watcher"
 import { Tool } from "@opencode/core/tool"
 import { Vcs } from "@opencode/core/vcs"
@@ -104,7 +106,9 @@ export const makePluginTestLayer = (permission = permissionLayer) =>
       Reference.node,
       Rpc.node,
       Skill.node,
+      SkillCatalog.node,
       SkillDiscovery.node,
+      SkillInstall.node,
       Tool.node,
       Vcs.node,
       Watcher.node,

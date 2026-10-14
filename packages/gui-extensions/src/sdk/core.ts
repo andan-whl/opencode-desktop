@@ -435,7 +435,7 @@ export type IpcImpl<S extends IpcSpec> = {
  *
  * @example
  * ```ts
- * const provider = ctx.provide(Updater, { state: () => updater.state(), check, install })
+ * const provider = ctx.provide(Wsl, { state: () => controller.getState(), startServer })
  * provider.changed()
  * ```
  */
@@ -611,7 +611,7 @@ export type MainStoreFrom =
   | {
       /** The key in the settings file, e.g. `ssh.servers`. */
       readonly settings: string
-      /** Another settings file of the desktop app, e.g. `opencode.updater`. Defaults to the app's settings file. */
+      /** Another settings file of the desktop app. Defaults to the app's settings file. */
       readonly file?: string
     }
   | {

@@ -42,6 +42,7 @@ import { SessionTitle } from "./session/title.js"
 import { SessionContext } from "./session/context.js"
 import { Skill } from "./skill.js"
 import { SkillInstructions } from "./skill/instructions.js"
+import { SkillInstall } from "./skill/install.js"
 import { Snapshot } from "./snapshot.js"
 import { InstructionDiscovery } from "./instruction-discovery.js"
 import { InstructionBuiltIns } from "./instructions/builtins.js"
@@ -82,6 +83,7 @@ const nodes = [
   Pty.node,
   Shell.node,
   Skill.node,
+  SkillInstall.node,
   InstructionBuiltIns.node,
   InstructionDiscovery.node,
   FileAccess.node,

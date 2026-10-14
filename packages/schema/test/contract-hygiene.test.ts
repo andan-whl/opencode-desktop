@@ -338,4 +338,45 @@ describe("contract hygiene", () => {
       files: [{ file: "src/index.ts", status: "modified", additions: 1, deletions: 0, patch: "@@" }],
     })
   })
+
+  test("skill install manifests round-trip through millis timestamps", () => {
+    const manifest = Schema.decodeUnknownSync(Skill.Manifest)({
+      version: 1,
+      entries: [
+        {
+          name: "docx",
+          source: { type: "git", ref: "https://github.com/anthropics/skills#skills/docx" },
+          version: "0d1a1f2c3b4e5f6a7980123456abcdef01234567",
+          installedAt: 1700000000000,
+        },
+      ],
+    })
+    expect(String(manifest.entries[0].name)).toBe("docx")
+    expect(Schema.encodeSync(Skill.Manifest)(manifest)).toEqual({
+      version: 1,
+      entries: [
+        {
+          name: "docx",
+          source: { type: "git", ref: "https://github.com/anthropics/skills#skills/docx" },
+          version: "0d1a1f2c3b4e5f6a7980123456abcdef01234567",
+          installedAt: 1700000000000,
+        },
+      ],
+    })
+    expect(() => Schema.decodeUnknownSync(Skill.Manifest)({ version: 2, entries: [] })).toThrow()
+    expect(
+      Schema.decodeUnknownSync(Skill.InstallResult)({
+        status: "installed",
+        name: "docx",
+        version: "abc",
+        path: "/home/user/.config/opencode/skills/docx",
+      }).status,
+    ).toBe("installed")
+    expect(
+      Schema.decodeUnknownSync(Skill.Catalog)({
+        version: 1,
+        entries: [{ name: "docx", description: "Document skills", category: "document", source: { type: "git", ref: "https://github.com/anthropics/skills#skills/docx" } }],
+      }).entries,
+    ).toHaveLength(1)
+  })
 })

@@ -3,10 +3,6 @@ import path from "node:path"
 import { OPENCODE_VERSION } from "../src/version"
 import type { FormFields } from "@opencode/client"
 
-const consoleForm = [
-  { type: "string", key: "server", hidden: true, format: "uri", default: "https://opencode.ai/console" },
-] satisfies FormFields
-
 describe("auth command", () => {
   test("registers authentication commands", async () => {
     const [auth, list, login, logout] = await Promise.all([
@@ -75,36 +71,6 @@ describe("auth command", () => {
     expect(requests.indexOf("/api/model/default")).toBeLessThan(requests.indexOf("/api/integration"))
   })
 
-  test("lists OpenCode Go before Zen and preserves the remaining integration order", async () => {
-    using server = authServer((request, url) => {
-      if (url.pathname === "/api/integration") {
-        return Response.json(
-          located(
-            [
-              { id: "opencode", name: "OpenCode Zen" },
-              { id: "anthropic", name: "Anthropic" },
-              { id: "opencode-go", name: "OpenCode Go" },
-            ].map((integration) => ({
-              ...integration,
-              methods: [],
-              connections: [{ type: "env", name: "TEST_API_KEY" }],
-            })),
-          ),
-        )
-      }
-      return new Response("Not found", { status: 404 })
-    })
-
-    const result = await cli(["auth", "list", "--server", server.url.toString()])
-    expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: "" })
-    expect(
-      result.stdout
-        .trim()
-        .split("\n")
-        .map((line) => line.split(/\s{2,}/)[0]),
-    ).toEqual(["OpenCode Go", "OpenCode Zen", "Anthropic"])
-  })
-
   test("runs command authentication without interactive input", async () => {
     const requests: Array<{ method: string; path: string }> = []
     using server = authServer((request, url) => {
@@ -143,20 +109,6 @@ describe("auth command", () => {
 
   test.each([
     { id: "openai", method: "browser", form: undefined, args: [], answer: undefined },
-    {
-      id: "opencode",
-      method: "device",
-      form: consoleForm,
-      args: [],
-      answer: { server: "https://opencode.ai/console" },
-    },
-    {
-      id: "opencode",
-      method: "device",
-      form: consoleForm,
-      args: ["--answer", "server=https://staging.example.com/console"],
-      answer: { server: "https://staging.example.com/console" },
-    },
     {
       id: "company",
       method: "browser",

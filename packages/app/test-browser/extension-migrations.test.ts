@@ -10,7 +10,6 @@ import context from "../../gui-extensions/src/context/index"
 import contextSetup from "../../gui-extensions/src/context/renderer"
 import details from "../../gui-extensions/src/details/index"
 import review from "../../gui-extensions/src/review/index"
-import updater from "../../gui-extensions/src/updater/index"
 
 /** A web window: storage is the page's localStorage. */
 const web: Platform = {
@@ -50,32 +49,12 @@ test.each([
     expected: { diffStyle: "unified" },
   },
   {
-    name: "Preferences releaseNotes → extension.updater.releaseNotes",
-    home: () =>
-      imported(
-        "updater",
-        "releaseNotes",
-        updater.stores.releaseNotes,
-        "opencode.global.dat:extension.updater.releaseNotes",
-        [["settings.v3", { general: { releaseNotes: false } }]],
-      ),
-    expected: { enabled: false },
-  },
-  {
     name: "Preferences mobileDiffWrap → extension.review.mobileDiff",
     home: () =>
       imported("review", "mobileDiff", review.stores.mobileDiff, "opencode.global.dat:extension.review.mobileDiff", [
         ["settings.v3", { general: { mobileDiffWrap: false } }],
       ]),
     expected: { wrap: false },
-  },
-  {
-    name: "What's New highlights.v1 → extension.updater.seen",
-    home: () =>
-      imported("updater", "seen", updater.stores.seen, "opencode.global.dat:extension.updater.seen", [
-        ["highlights.v1", { version: "2.0.20" }],
-      ]),
-    expected: { version: "2.0.20" },
   },
   {
     name: "keybind summary.toggle → details.toggle",

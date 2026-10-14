@@ -2,7 +2,7 @@
 // Cold-start benchmark for a packaged desktop build.
 //
 //   bun run bench:startup -- [--exe <path>] [--compare <path>] [--runs 5] [--warmup 1] [--service warm|cold]
-//                            [--fresh] [--offline] [--seed <userData dir>] [--profile-main] [--profile-renderer]
+//                            [--fresh] [--seed <userData dir>] [--profile-main] [--profile-renderer]
 //                            [--trace] [--out <dir>] [--home <dir>] [--window-at x,y]
 //
 // The app runs in an isolated home directory (its own %APPDATA%, XDG dirs, OpenCode DB, config and
@@ -45,7 +45,6 @@ const args = parseArgs({
     warmup: { type: "string", default: "1" },
     service: { type: "string", default: "warm" },
     fresh: { type: "boolean", default: false },
-    offline: { type: "boolean", default: false },
     seed: { type: "string" },
     home: { type: "string" },
     out: { type: "string" },
@@ -113,7 +112,7 @@ prepareHome()
 // OPENCODE_* and OTEL_* from the developer's shell would otherwise leak into the measured app and
 // its service (an OTLP endpoint alone adds a network round trip to every CLI exit).
 const env = {
-  ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(OPENCODE_|OTEL_|SENTRY_)/.test(key))),
+  ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(OPENCODE_|OTEL_)/.test(key))),
   USERPROFILE: home,
   HOME: home,
   APPDATA: paths.appData,
@@ -125,8 +124,6 @@ const env = {
   XDG_CACHE_HOME: join(home, ".cache"),
   OPENCODE_DB: paths.db,
   OPENCODE_CONFIG_DIR: paths.config,
-  // Beta and prod builds check for updates on start; a closed proxy port fails that fast and offline.
-  ...(args.values.offline || appId !== "ai.opencode.desktop.dev" ? { HTTPS_PROXY: "http://127.0.0.1:9" } : {}),
 }
 
 const cdpPort = await freePort()
@@ -563,20 +560,20 @@ async function mainBootTiming() {
 function defaultExe() {
   const unpacked = join(packageDir, "dist", process.platform === "win32" ? "win-unpacked" : process.platform === "darwin" ? "mac" : "linux-unpacked")
 
-  if (!existsSync(unpacked)) return join(unpacked, "OpenCode Dev.exe")
+  if (!existsSync(unpacked)) return join(unpacked, "OpenCodeDesktop Dev.exe")
   const candidate = readdirSync(unpacked).find((f) => (process.platform === "win32" ? f.endsWith(".exe") : f.endsWith(".app") || !f.includes(".")))
 
-  return join(unpacked, candidate ?? "OpenCode Dev.exe")
+  return join(unpacked, candidate ?? "OpenCodeDesktop Dev.exe")
 }
 
 function appIdFor(executable: string) {
   const name = basename(executable, ".exe")
 
-  if (/beta/i.test(name)) return "ai.opencode.desktop.beta"
+  if (/beta/i.test(name)) return "com.opencodedesktop.app.beta"
 
-  if (/dev/i.test(name)) return "ai.opencode.desktop.dev"
+  if (/dev/i.test(name)) return "com.opencodedesktop.app.dev"
 
-  return "ai.opencode.desktop"
+  return "com.opencodedesktop.app"
 }
 
 function prepareHome() {

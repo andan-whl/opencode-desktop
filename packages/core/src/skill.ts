@@ -28,6 +28,23 @@ export type ID = Skill.ID
 export const Name = Skill.Name
 export type Name = Skill.Name
 
+export const InstallSource = Skill.InstallSource
+export type InstallSource = Skill.InstallSource
+export const ManifestEntry = Skill.ManifestEntry
+export type ManifestEntry = Skill.ManifestEntry
+export const Manifest = Skill.Manifest
+export type Manifest = Skill.Manifest
+export const InstallStatus = Skill.InstallStatus
+export type InstallStatus = Skill.InstallStatus
+export const InstallResult = Skill.InstallResult
+export type InstallResult = Skill.InstallResult
+export const CatalogSource = Skill.CatalogSource
+export type CatalogSource = Skill.CatalogSource
+export const CatalogEntry = Skill.CatalogEntry
+export type CatalogEntry = Skill.CatalogEntry
+export const Catalog = Skill.Catalog
+export type Catalog = Skill.Catalog
+
 export { Event } from "@opencode/schema/skill"
 
 export const available = (skills: ReadonlyArray<Info>, permissions: Permission.Ruleset) =>

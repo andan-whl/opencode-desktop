@@ -1,6 +1,6 @@
 # GUI extensions
 
-Every feature of the desktop and web app that is not the core shell is an extension: the terminal, review, files, the browser, SSH, WSL, the updater and more. Each one builds only on the SDK in [`src/sdk`](src/sdk). The SDK is typed so that the common bugs fail to compile or fail the lint, and every declaration has TSDoc, so editor hovers answer most questions. This guide shows how the parts fit, with code from the extensions that ship. [Build your first extension](#build-your-first-extension) walks through [`src/pairing`](src/pairing), a small built-in that uses both processes. `bun run lint` checks every code block marked with its source against that source.
+Every feature of the desktop and web app that is not the core shell is an extension: the terminal, review, files, the browser, SSH, WSL and more. Each one builds only on the SDK in [`src/sdk`](src/sdk). The SDK is typed so that the common bugs fail to compile or fail the lint, and every declaration has TSDoc, so editor hovers answer most questions. This guide shows how the parts fit, with code from the extensions that ship. [Build your first extension](#build-your-first-extension) walks through [`src/pairing`](src/pairing), a small built-in that uses both processes. `bun run lint` checks every code block marked with its source against that source.
 
 - Window SDK: `@opencode/gui-extensions/sdk` ([`index.ts`](src/sdk/index.ts))
 - Main-process SDK: `@opencode/gui-extensions/sdk/main` ([`main.ts`](src/sdk/main.ts))
@@ -31,7 +31,7 @@ src/pairing/
 └── i18n/en.ts        English copy; other locales load when picked
 ```
 
-Unit tests of logic that carries a contract sit beside the code as `*.test.ts`, as in `src/ssh/` and `src/updater/`.
+Unit tests of logic that carries a contract sit beside the code as `*.test.ts`, as in `src/ssh/`.
 
 `Extension.define` is the manifest. The host reads it before any entry loads.
 
@@ -107,14 +107,13 @@ stateDiagram-v2
 - Teardown of other work: `onCleanup` in the window, `ctx.scope.addFinalizer` in main. Setup returns nothing.
 - Window setup is synchronous: its `undefined` return type rejects async functions, and the host fails thenable-returning JavaScript setups instead of waiting for them. Put async work in `createKeyed` or `createLatest`, with `ctx.signal` or a signal derived from it. Only main setup may be async. After each `await` there is no owner; return if the signal aborted before registering or changing state. Late registrations remain safe: the host releases them when the owner or instance ended.
 
-The updater listens to its main side's `check` event once per generation of that side. When main restarts, the run ends and its listener goes with it:
+The browser listens to its pane Ipc's events once per generation of that side. When the Ipc's generation ends, the run ends and its listener goes with it:
 
-<!-- source: src/updater/renderer.tsx#createKeyed -->
+<!-- source: src/browser/model.ts#createKeyed -->
 
 ```tsx
-// Beta builds answer the app menu's Check for Updates in the focused window instead of a native dialog. The
-// listener ends with the generation of the main side that sends it.
-createKeyed(updater, (client) => void client.on("check", () => act("check")))
+// The SDK removes the listener when the Ipc's generation ends.
+createKeyed(pane, (current) => current.on("event", (value) => listeners.get(value.binding)?.(value.event)))
 ```
 
 ### The routed session
@@ -175,7 +174,7 @@ ctx.add(Command, {
 | `onIdle(fn)`                                     | Preloading a lazy chunk while the app is idle                                       |
 | `Scope` (main)                                   | `ctx.scope`: `signal`, `addFinalizer`, `fork`, `close`                              |
 
-[Lifetimes](#lifetimes) shows `createKeyed` in the updater.
+[Lifetimes](#lifetimes) shows `createKeyed` in the browser.
 
 ```ts
 // Forget a selection when the user goes Home and back.
@@ -262,18 +261,17 @@ An `Ipc` is the typed contract between an extension's main entry and its windows
 
 ```mermaid
 sequenceDiagram
-  participant W as updater window (ctx.uses.updater)
+  participant W as wsl window (ctx.uses.wsl)
   participant B as bridge
-  participant M as updater main (ctx.provide)
+  participant M as wsl main (ctx.provide)
   W->>B: subscribe
   B->>M: state(window)
   M-->>W: available + state snapshot
-  W->>B: check(), input encoded
+  W->>B: startServer({ id }), input encoded
   B->>M: decoded input, Caller { window, signal }
-  M->>M: the state moves to "checking", provider.changed()
+  M->>M: the distro moves to "starting", provider.changed()
   M-->>W: state push (an event always wins over an older snapshot)
   M-->>W: reply, output encoded
-  M-->>W: emit("check", null, window): the app menu asks this window to check
 ```
 
 - Define it in `contract.ts`. Its id is your extension id, or `<id>.<name>`. A method without an input schema takes only optional call options: `pairing.screenActive({ signal })`, never an `undefined` placeholder.
@@ -313,18 +311,17 @@ A reference cannot go in `requires`: setup would wait for a `load` that only set
 - An Ipc call can reject while the event that explains it is still in flight. When main reports an outcome as an event, let the event decide.
 - A contribution that throws renders nothing and records the error. The rest of the window keeps working.
 
-The updater's actions branch on the `Live` value and still answer while its main side is missing:
+WSL's actions branch on the `Live` value and still answer while its main side is missing:
 
-<!-- source: src/updater/renderer.tsx#act -->
+<!-- source: src/wsl/renderer.tsx#api -->
 
 ```tsx
-const act = (name: "check" | "install") => {
-  const live = updater()
+// Without its main side, loading or gone, every action fails as WSL being unavailable, as the add dialog shows.
+const api = () => {
+  const live = ipc()
 
-  if (live.status === "active") return void import("./actions").then((module) => module[name](ctx, live.value))
-
-  // Not loaded yet, or gone (disabled, failed, blocked, restarting): nothing can check or install.
-  showToast({ title: ctx.t("common.requestFailed") })
+  if (live.status === "active") return live.value
+  throw new Error(ctx.t("error.unavailable"))
 }
 ```
 
@@ -620,7 +617,6 @@ export const builtins = Extension.compose(
   details,
   { ...browser, main: () => import("./browser/main") },
   { ...pairing, main: () => import("./pairing/main") },
-  { ...updater, main: () => import("./updater/main") },
   { ...ssh, main: () => import("./ssh/main") },
   { ...wsl, main: () => import("./wsl/main") },
   microsoftOffice,
@@ -646,7 +642,6 @@ export const builtins = Extension.compose(
   { ...details, renderer: eager(detailsRenderer) },
   { ...browser, renderer: eager(browserRenderer) },
   { ...pairing, renderer: eager(pairingRenderer) },
-  { ...updater, renderer: eager(updaterRenderer) },
   { ...ssh, renderer: eager(sshRenderer) },
   { ...wsl, renderer: eager(wslRenderer) },
   { ...microsoftOffice, renderer: eager(microsoftOfficeRenderer) },

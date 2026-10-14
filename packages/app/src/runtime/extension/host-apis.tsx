@@ -310,7 +310,6 @@ export function createHostApis() {
       sidebar: { opened: () => current()?.layout.sidebar.opened() ?? true },
       dock: {
         opened: (session) => current()?.layout.dock.opened(session) ?? false,
-        placement: () => current()?.layout.dock.placement() ?? "side",
       },
       scroll: {
         get: (session, key) => current()?.layout.scroll.get(session, key),
@@ -827,7 +826,6 @@ export function createExtensionAttachment(apis: HostApis) {
       sidebar: { opened: () => sidebar()?.opened() ?? true },
       dock: {
         opened: dockOpened,
-        placement: settings.general.terminalPlacement,
       },
       scroll: {
         get(session, key) {

@@ -57,6 +57,11 @@ const startEntries = Effect.fnUntraced(function* (
   const pluginHost = host({
     skill: {
       list: () => Effect.die("unused skill.list"),
+      install: () => Effect.die("unused skill.install"),
+      uninstall: () => Effect.die("unused skill.uninstall"),
+      update: () => Effect.die("unused skill.update"),
+      installed: () => Effect.die("unused skill.installed"),
+      catalog: () => Effect.die("unused skill.catalog"),
       transform: service.transform,
       reload: service.reload,
     },

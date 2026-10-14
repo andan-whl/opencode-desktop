@@ -13,9 +13,6 @@
     "dev:vite:live": "sh -c 'OPENCODE_TUI_CHANNEL=dev OPENCODE_PASSWORD=\"$(opencode service get password)\" exec bun run dev:vite \"$@\" --server \"$(opencode service status)\"' --",
     "dev:desktop": "bun --cwd packages/desktop dev",
     "dev:web": "bun --cwd packages/app dev",
-    "dev:console": "ulimit -n 10240 2>/dev/null; bun run --cwd packages/console/app dev",
-    "dev:stats": "bun sst shell --stage=production -- bun run --cwd packages/stats/app dev",
-    "dev:www": "bun run --cwd services/www dev",
     "dev:storybook": "bun --cwd packages/storybook storybook",
     "bench:devex": "bun run --cwd packages/app test:bench:devex",
     "lint": "oxlint && ast-grep scan -c script/ast-grep/gui-extensions/sgconfig.yml && bun script/sdk-docs.ts",
@@ -32,16 +29,12 @@
     "postinstall": "bun run --cwd packages/core fix-node-pty",
     "prepare": "husky",
     "random": "echo 'Random script'",
-    "sso": "aws sso login --sso-session=opencode --no-browser",
     "test": "echo 'do not run tests from root' && exit 1"
   },
   "workspaces": {
     "packages": [
       "packages/*",
-      "packages/plugins/*",
-      "services/*",
-      "packages/console/*",
-      "packages/stats/*"
+      "packages/plugins/*"
     ],
     "catalog": {
       "@effect/opentelemetry": "4.0.1",
@@ -107,8 +100,6 @@
       "@solidjs/meta": "0.29.4",
       "@solidjs/router": "1.0.0",
       "@solidjs/start": "https://pkg.pr.new/@solidjs/start@dfb2020",
-      "@sentry/solid": "10.71.0",
-      "@sentry/vite-plugin": "5.4.0",
       "solid-js": "1.9.15",
       "solid-sonner": "0.3.1",
       "vite-plugin-solid": "2.11.10",

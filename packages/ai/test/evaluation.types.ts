@@ -1,7 +1,7 @@
 import { Effect } from "effect"
 import { Evaluation, EvaluationClient, EvaluationModel, type EvaluationRoute } from "../src/experimental.js"
 import type { Service } from "../src/experimental/evaluation-client.js"
-import { OpenCode, OpenRouter, TypeSafeAI, VercelAIGateway } from "../src/providers.js"
+import { OpenRouter, TypeSafeAI, VercelAIGateway } from "../src/providers.js"
 
 type Requirements<T> = T extends Effect.Effect<infer _A, infer _E, infer R> ? R : never
 type Success<T> = T extends Effect.Effect<infer A, infer _E, infer _R> ? A : never
@@ -31,19 +31,6 @@ type ClientRequirements = Assert<Equal<Requirements<typeof result>, Service>>
 void (true satisfies Choice)
 void (true satisfies Confidence)
 void (true satisfies ClientRequirements)
-
-Effect.gen(function* () {
-  const response = yield* Evaluation.run({
-    model: OpenCode.experimental.evaluation("jev-1.13"),
-    state: ["hello"],
-    questions: { greeting: { type: "boolean", instructions: "Greeting?" } },
-  })
-  response.answers.greeting.probability satisfies number
-  // @ts-expect-error Boolean answers do not contain a selected choice.
-  response.answers.greeting.choice
-  // @ts-expect-error Unknown question IDs are not exposed.
-  response.answers.missing
-})
 
 declare const route: EvaluationRoute<{ readonly temperature?: number }>
 const custom = EvaluationModel.make({ id: "custom", provider: "custom", route })

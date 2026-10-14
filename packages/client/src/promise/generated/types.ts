@@ -248,6 +248,10 @@ export type PermissionSavedID = string
 
 export type CommandInfo = { name: string; description?: string }
 
+export type SkillInstallSource = { type: "path" | "url" | "git" | "index"; ref: string }
+
+export type SkillCatalogSource = { type: "git" | "url"; ref: string }
+
 export type RpcOutput = { output?: any }
 
 export type PermissionReply = "once" | "always" | "reject"
@@ -442,6 +446,13 @@ export type SkillInfo = {
   autoinvoke?: boolean
   path: AbsolutePath
   content: string
+}
+
+export type SkillInstallResult = {
+  status: "installed" | "updated" | "noop"
+  name: SkillName
+  version: string
+  path: AbsolutePath
 }
 
 export type SessionMessageShell = {
@@ -735,6 +746,10 @@ export type PermissionSavedInfo = {
   resource: string
   time: { created: number; updated: number }
 }
+
+export type SkillManifestEntry = { name: SkillName; source: SkillInstallSource; version: string; installedAt: number }
+
+export type SkillCatalogEntry = { name: SkillName; description: string; category: string; source: SkillCatalogSource }
 
 export type Pty = {
   id: PtyID
@@ -1760,7 +1775,6 @@ export type TuiCommandExecute = {
     command:
       | "session.list"
       | "session.new"
-      | "session.share"
       | "session.interrupt"
       | "session.background"
       | "session.compact"
@@ -2149,9 +2163,6 @@ export type ConfigEntry =
         shell?: string
         model?: string | { providerID: string; model: string; variant?: string }
         default_agent?: string
-        update?: "disable" | "notify" | "auto"
-        share?: "manual" | "auto" | "disabled"
-        enterprise?: { url?: string }
         username?: string
         permissions?: PermissionRuleset
         agents?: {
@@ -2835,6 +2846,14 @@ export const isPermissionNotFoundError = (value: unknown): value is PermissionNo
 export type FileNotFoundError = { readonly _tag: "FileNotFoundError"; readonly path: string; readonly message: string }
 export const isFileNotFoundError = (value: unknown): value is FileNotFoundError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "FileNotFoundError"
+
+export type SkillNotManagedError = {
+  readonly _tag: "SkillNotManagedError"
+  readonly skill: string
+  readonly message: string
+}
+export const isSkillNotManagedError = (value: unknown): value is SkillNotManagedError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "SkillNotManagedError"
 
 export type RpcError = {
   readonly _tag: "RpcError"
@@ -6371,6 +6390,40 @@ export type SkillListInput = {
 }
 
 export type SkillListOutput = { location: LocationPublicRef; data: Array<SkillInfo> }
+
+export type SkillInstallInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly type: { readonly type: "path" | "url" | "git" | "index"; readonly ref: string }["type"]
+  readonly ref: { readonly type: "path" | "url" | "git" | "index"; readonly ref: string }["ref"]
+}
+
+export type SkillInstallOutput = { location: LocationPublicRef; data: Array<SkillInstallResult> }
+
+export type SkillUninstallInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly name: { readonly name: string }["name"]
+}
+
+export type SkillUninstallOutput = void
+
+export type SkillUpdateInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly name?: { readonly name?: string | undefined }["name"]
+}
+
+export type SkillUpdateOutput = { location: LocationPublicRef; data: Array<SkillInstallResult> }
+
+export type SkillInstalledInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+}
+
+export type SkillInstalledOutput = { location: LocationPublicRef; data: Array<SkillManifestEntry> }
+
+export type SkillCatalogInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+}
+
+export type SkillCatalogOutput = { location: LocationPublicRef; data: Array<SkillCatalogEntry> }
 
 export type RpcCallInput = {
   readonly rpcID: { readonly rpcID: string; readonly method: string }["rpcID"]

@@ -12,6 +12,21 @@ export interface OpenRequest {
   set(app: OpenApp | undefined): void
 }
 
+/**
+ * The file editor's draft of one workspace path: where the user left it, and the text when it differs from the file
+ * on disk. A draft without `text` is clean and only restores the view.
+ */
+export interface FileDraft {
+  /** The vertical scroll offset to restore. */
+  readonly top: number
+  /** The main selection to restore. */
+  readonly anchor: number
+  /** The head of the main selection to restore. */
+  readonly head: number
+  /** The unsaved text; present only while it differs from the file on disk. */
+  readonly text?: string
+}
+
 /** Per-window file state that setup owns and its lazily loaded views share. */
 export interface FileShared {
   readonly changes: Accessor<Live<Changes>>
@@ -46,6 +61,16 @@ export interface FileShared {
   readonly reveal: {
     register(session: string, path: string, run: () => void): () => void
     run(session: string, path: string): void
+  }
+  /**
+   * The file editor's drafts, keyed by workspace root then path, kept across tab switches so unsaved edits survive
+   * them. Reactive: a tab trigger reads a draft to show its unsaved mark.
+   */
+  readonly edit: {
+    /** The root's draft for the path; undefined while none is kept. */
+    get(root: string, path: string): FileDraft | undefined
+    /** Stores the root's draft for the path, replacing any earlier one. */
+    set(root: string, path: string, draft: FileDraft): void
   }
   /** The tab is the session's selected side tab. */
   active(session: MountedSession, id: string): boolean

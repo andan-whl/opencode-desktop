@@ -52,7 +52,7 @@ export const relocate = Effect.fnUntraced(function* (directory: string, destinat
 
 /**
  * Whether the running binary was installed by a package manager or the curl installer, the installs
- * whose upgrades replace it in place. The updater decides the same question from the install location.
+ * whose upgrades replace it in place.
  */
 export function installed(home: string) {
   const runtime = path.basename(process.execPath, path.extname(process.execPath)).toLowerCase()

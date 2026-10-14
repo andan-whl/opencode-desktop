@@ -726,7 +726,7 @@ export function mountBrowserRegion(input: RegionHost) {
         ),
       side: { opened: () => true, toggle() {} },
       sidebar: { opened: () => true },
-      dock: { opened: () => false, placement: () => "side" },
+      dock: { opened: () => false },
       scroll: { get: () => undefined, set() {} },
       settings() {},
       project() {},

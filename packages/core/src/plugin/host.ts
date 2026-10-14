@@ -25,6 +25,8 @@ import { Reference } from "../reference.js"
 import { Rpc } from "../rpc.js"
 import { AbsolutePath, type DeepMutable } from "../schema.js"
 import { Skill } from "../skill.js"
+import { SkillCatalog } from "../skill/catalog.js"
+import { SkillInstall } from "../skill/install.js"
 import { Tool } from "../tool.js"
 import { Workspace } from "../workspace.js"
 import { Vcs } from "../vcs.js"
@@ -62,6 +64,8 @@ export const make = Effect.fn("PluginHost.make")(function* (
   const reference = yield* Reference.Service
   const rpc = yield* Rpc.Service
   const skill = yield* Skill.Service
+  const install = yield* SkillInstall.Service
+  const catalog = yield* SkillCatalog.Service
   const tools = yield* Tool.Service
   const vcs = yield* Vcs.Service
   const websearch = yield* WebSearch.Service
@@ -453,6 +457,17 @@ export const make = Effect.fn("PluginHost.make")(function* (
     },
     skill: {
       list: () => response(skill.list()),
+      install: (input) => response(install.install(input)),
+      uninstall: (input) => install.uninstall(input.name),
+      update: (input) =>
+        response(
+          Effect.gen(function* () {
+            const names = input?.name ? [input.name] : (yield* install.list()).map((entry) => entry.name)
+            return yield* Effect.forEach(names, (name) => install.update(name))
+          }),
+        ),
+      installed: () => response(install.list()),
+      catalog: () => response(catalog.list()),
       reload: skill.reload,
       transform: (callback) =>
         skill.transform((editor) => {
@@ -596,6 +611,8 @@ export const requirements = LayerNode.group([
   Reference.node,
   Rpc.node,
   Skill.node,
+  SkillInstall.node,
+  SkillCatalog.node,
   Tool.node,
   Vcs.node,
   WebSearch.node,

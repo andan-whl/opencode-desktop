@@ -1,4 +1,4 @@
-import { createMemo, createSignal, Match, on, onCleanup, Show, Switch } from "solid-js"
+import { createMemo, createSignal, lazy, Match, on, onCleanup, Show, Suspense, Switch } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Dynamic } from "solid-js/web"
 import { makeEventListener } from "@solid-primitives/event-listener"
@@ -14,7 +14,11 @@ import { createKeyed, useExtension, type LineRange, type MountedSession, type Se
 import { artifactKind } from "@opencode/util/artifact"
 import ArtifactView from "./artifact-view"
 import { useShared } from "./context"
+import { MAX_EDIT_CHARS } from "./editor-language"
 import { fileTabPath } from "./path"
+
+// CodeMirror loads with the editor chunk alone, so the file browser never waits for it.
+const FileEditor = lazy(() => import("./editor"))
 
 type FileSelection = { startLine: number; endLine: number; startChar: number; endChar: number }
 
@@ -367,7 +371,8 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
     ),
   })
 
-  // Mod+F finds in the shown file.
+  // Mod+F finds in the shown file. Only the read-only code view registers a handle; the editor's own search takes
+  // the event when none is registered.
   makeEventListener(
     window,
     "keydown",
@@ -377,6 +382,8 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return
 
       if (event.key.toLowerCase() !== "f") return
+
+      if (!state.find) return
 
       event.preventDefault()
       event.stopPropagation()
@@ -504,7 +511,35 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
       <Switch>
         <Match when={current()?.loaded ? current()?.content : undefined}>
           {(value) => (
-            <Show when={artifact()} fallback={codeView(value().content)}>
+            <Show
+              when={artifact()}
+              fallback={
+                // A text file edits unless it is too large to keep an editable document responsive.
+                <Show
+                  when={value().content.length <= MAX_EDIT_CHARS ? path() : undefined}
+                  keyed
+                  fallback={
+                    <>
+                      <Show when={value().content.length > MAX_EDIT_CHARS}>
+                        <div class="px-6 pb-2 pt-3 text-12-regular text-text-weak">{ctx.t("editor.tooLarge")}</div>
+                      </Show>
+                      {codeView(value().content)}
+                    </>
+                  }
+                >
+                  {(editPath) => (
+                    <Suspense fallback={<div class="min-h-0 flex-1" />}>
+                      <FileEditor
+                        session={props.session}
+                        screen={props.screen}
+                        path={editPath}
+                        content={value().content}
+                      />
+                    </Suspense>
+                  )}
+                </Show>
+              }
+            >
               <ArtifactView
                 session={props.session}
                 path={path() ?? ""}

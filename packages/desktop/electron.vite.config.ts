@@ -15,23 +15,6 @@ function resolveChannel() {
 
 const appPlugin = (await import("@opencode/app/vite")).default
 
-const sentry =
-  process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
-    ? (await import("@sentry/vite-plugin")).sentryVitePlugin({
-        authToken: process.env.SENTRY_AUTH_TOKEN,
-        org: process.env.SENTRY_ORG,
-        project: process.env.SENTRY_PROJECT,
-        telemetry: false,
-        release: {
-          name: process.env.SENTRY_RELEASE ?? process.env.VITE_SENTRY_RELEASE,
-        },
-        sourcemaps: {
-          assets: "./out/renderer/**",
-          filesToDeleteAfterUpload: "./out/renderer/**/*.map",
-        },
-      })
-    : false
-
 // Every module the entry reaches through static imports lands in one chunk. Automatic splitting
 // otherwise fragments the initial graph into ~50 files shared with lazy routes, and each file costs
 // the renderer a main-thread request round trip through the main process before first paint.
@@ -60,7 +43,7 @@ export default defineConfig(({ command }) => {
         dedupe: ["effect"],
       },
       define: {
-        // Local renderer/server mode still uses the dev application identity and updater policy.
+        // Local renderer/server mode still uses the dev application identity.
         "import.meta.env.OPENCODE_CHANNEL": JSON.stringify(channel === "local" ? "dev" : channel),
       },
       build: {
@@ -127,7 +110,7 @@ const require = __cjs_mod__.createRequire(import.meta.url);
           command === "serve" && process.env.OPENCODE_TEST_ONBOARDING === "1",
         ),
       },
-      plugins: [pickerPlugin(), appPlugin, initialChunk, sentry],
+      plugins: [pickerPlugin(), appPlugin, initialChunk],
       publicDir: "../../../app/public",
       root: "src/renderer",
       build: {

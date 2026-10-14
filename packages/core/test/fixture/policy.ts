@@ -33,6 +33,11 @@ export const registerIntegrationPolicy = Effect.fn(function* (input: {
       },
       skill: {
         list: () => Effect.die("unused skill.list"),
+        install: () => Effect.die("unused skill.install"),
+        uninstall: () => Effect.die("unused skill.uninstall"),
+        update: () => Effect.die("unused skill.update"),
+        installed: () => Effect.die("unused skill.installed"),
+        catalog: () => Effect.die("unused skill.catalog"),
         transform: (callback) => input.skill?.transform(callback) ?? Effect.succeed({ dispose: Effect.void }),
         reload: () => input.skill?.reload() ?? Effect.void,
       },

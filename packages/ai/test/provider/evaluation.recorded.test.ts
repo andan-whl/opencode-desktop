@@ -1,7 +1,7 @@
 import { describe, expect } from "bun:test"
 import { Effect } from "effect"
 import { Evaluation, EvaluationModel, type EvaluationOptions } from "../../src/experimental.js"
-import { OpenCode, OpenRouter, TypeSafeAI } from "../../src/providers.js"
+import { OpenRouter, TypeSafeAI } from "../../src/providers.js"
 import { recordedTests } from "../recorded-test.js"
 
 const questions = {
@@ -32,14 +32,6 @@ const typesafe = recordedTests({
   metadata: { model: "jev-latest" },
 })
 
-const opencode = recordedTests({
-  prefix: "opencode-evaluation",
-  provider: "opencode",
-  protocol: "system-one",
-  requires: ["OPENCODE_API_KEY"],
-  metadata: { model: "jev-1.13-free" },
-})
-
 const openrouter = recordedTests({
   prefix: "openrouter-evaluation",
   provider: "openrouter",
@@ -52,14 +44,6 @@ describe("experimental Evaluation recorded", () => {
   typesafe.effect("evaluates choice score and boolean questions", () =>
     assertEvaluation(
       TypeSafeAI.configure({ apiKey: process.env.TYPESAFE_API_KEY ?? "fixture" }).experimental.evaluation("jev-latest"),
-    ),
-  )
-
-  opencode.effect("evaluates choice score and boolean questions", () =>
-    assertEvaluation(
-      OpenCode.configure({ apiKey: process.env.OPENCODE_API_KEY ?? "fixture" }).experimental.evaluation(
-        "jev-1.13-free",
-      ),
     ),
   )
 

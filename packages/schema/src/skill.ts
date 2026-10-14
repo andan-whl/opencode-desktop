@@ -2,7 +2,7 @@ export * as Skill from "./skill.js"
 
 import { Schema } from "effect"
 import { optional } from "./schema.js"
-import { AbsolutePath } from "./schema.js"
+import { AbsolutePath, DateTimeUtcFromMillis } from "./schema.js"
 import { ephemeral, inventory } from "./event.js"
 
 export const ID = Schema.String.pipe(Schema.brand("Skill.ID"), Schema.annotate({ identifier: "Skill.ID" }))
@@ -64,3 +64,54 @@ export const Source = Object.assign(
           : `embedded:${source.skill.id}`,
   },
 )
+
+export interface InstallSource extends Schema.Schema.Type<typeof InstallSource> {}
+export const InstallSource = Schema.Struct({
+  type: Schema.Literals(["path", "url", "git", "index"]),
+  ref: Schema.String,
+}).annotate({ identifier: "Skill.InstallSource" })
+
+export interface ManifestEntry extends Schema.Schema.Type<typeof ManifestEntry> {}
+export const ManifestEntry = Schema.Struct({
+  name: Name,
+  source: InstallSource,
+  version: Schema.String,
+  installedAt: DateTimeUtcFromMillis,
+}).annotate({ identifier: "Skill.ManifestEntry" })
+
+export interface Manifest extends Schema.Schema.Type<typeof Manifest> {}
+export const Manifest = Schema.Struct({
+  version: Schema.Literal(1),
+  entries: Schema.Array(ManifestEntry),
+}).annotate({ identifier: "Skill.Manifest" })
+
+export const InstallStatus = Schema.Literals(["installed", "updated", "noop"])
+export type InstallStatus = typeof InstallStatus.Type
+
+export interface InstallResult extends Schema.Schema.Type<typeof InstallResult> {}
+export const InstallResult = Schema.Struct({
+  status: InstallStatus,
+  name: Name,
+  version: Schema.String,
+  path: AbsolutePath,
+}).annotate({ identifier: "Skill.InstallResult" })
+
+export interface CatalogSource extends Schema.Schema.Type<typeof CatalogSource> {}
+export const CatalogSource = Schema.Struct({
+  type: Schema.Literals(["git", "url"]),
+  ref: Schema.String,
+}).annotate({ identifier: "Skill.CatalogSource" })
+
+export interface CatalogEntry extends Schema.Schema.Type<typeof CatalogEntry> {}
+export const CatalogEntry = Schema.Struct({
+  name: Name,
+  description: Schema.String,
+  category: Schema.String,
+  source: CatalogSource,
+}).annotate({ identifier: "Skill.CatalogEntry" })
+
+export interface Catalog extends Schema.Schema.Type<typeof Catalog> {}
+export const Catalog = Schema.Struct({
+  version: Schema.Literal(1),
+  entries: Schema.Array(CatalogEntry),
+}).annotate({ identifier: "Skill.Catalog" })

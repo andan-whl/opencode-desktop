@@ -7,14 +7,12 @@ import { getErrorReported } from "effect/Runtime"
 import { Commands } from "./commands/commands"
 import { Runtime } from "./framework/runtime"
 import { Observability } from "@opencode/util/observability"
-import { Updater } from "./services/updater"
 import { OPENCODE_ARTIFACT, OPENCODE_CHANNEL, OPENCODE_LOCAL, OPENCODE_VERSION } from "./version"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Global } from "@opencode/util/global"
 import { AppProcess } from "@opencode/util/process"
 import { Config } from "./config"
 import { Npm } from "@opencode/util/npm"
-import { EffectFlock } from "@opencode/util/effect-flock"
 import { Heap } from "./heap"
 import { CpuProfile } from "./cpu-profile"
 
@@ -27,7 +25,6 @@ if (process.env.OPENCODE_SSH_ASKPASS_PORT) {
 
 const Handlers = Runtime.handlers(Commands, {
   $: () => import("./commands/handlers/default"),
-  upgrade: () => import("./commands/handlers/upgrade"),
   uninstall: () => import("./commands/handlers/uninstall"),
   acp: () => import("./commands/handlers/acp"),
   api: () => import("./commands/handlers/api"),
@@ -56,6 +53,12 @@ const Handlers = Runtime.handlers(Commands, {
     check: () => import("./commands/handlers/plugin/check"),
     update: () => import("./commands/handlers/plugin/update"),
     remove: () => import("./commands/handlers/plugin/remove"),
+  },
+  skill: {
+    list: () => import("./commands/handlers/skill/list"),
+    add: () => import("./commands/handlers/skill/add"),
+    update: () => import("./commands/handlers/skill/update"),
+    remove: () => import("./commands/handlers/skill/remove"),
   },
   models: () => import("./commands/handlers/models"),
   stats: () => import("./commands/handlers/stats"),
@@ -115,9 +118,8 @@ Effect.gen(function* () {
   ),
   Effect.annotateLogs({ role: "cli" }),
   Effect.provide(Config.layer),
-  Effect.provide(Updater.layer),
   Effect.provide(
-    LayerNode.compile(LayerNode.group([Global.node, AppProcess.node, Npm.node, EffectFlock.node]), {
+    LayerNode.compile(LayerNode.group([Global.node, AppProcess.node, Npm.node]), {
       replacements: [
         Global.node.replace(
           Global.layerWith(process.env.OPENCODE_CONFIG_DIR ? { config: process.env.OPENCODE_CONFIG_DIR } : {}),

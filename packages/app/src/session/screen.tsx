@@ -20,14 +20,14 @@ import type { SessionModel } from "@/session/model"
 import { SESSION_PANEL_WIDTH_MIN } from "@/session/session-panel-width"
 import { SessionPanelFrame } from "@/session/session-frame"
 import { useExtensionHost } from "@/runtime/extension/host"
-import { ExtensionLinks } from "@/runtime/extension/render"
+import { ExtensionLinks, ExtensionSlot } from "@/runtime/extension/render"
 import { createPanelSidebar, createRegion, DockRegion, MobilePanel } from "@/runtime/extension/panels"
 import { createMobileViews, MobileViewTabs } from "@/runtime/extension/mobile"
 import { useExtensionAttachment } from "@/runtime/extension/host-apis"
 import { createMountedSession } from "@/runtime/extension/mounted-session"
 import { useUsageExceededDialogs } from "./usage-exceeded-dialogs"
 import { SessionErrorFallback } from "./route-error"
-import { createSessionScreenLayout } from "./screen-layout"
+import { createSessionScreenLayout, FILE_TREE_WIDTH_MIN, FILE_TREE_WIDTH_MAX } from "./screen-layout"
 import { SideRegion } from "@/runtime/extension/side-region"
 import { createSessionTimelineInteraction } from "./timeline/interaction"
 import { createTimelineSearchController } from "./timeline/search-controller"
@@ -100,57 +100,38 @@ function SessionScreenContent(props: {
     bottomDockCached: false,
     sideWidthMotion: false,
     timelineScrollbarHidden: false,
-    sideHeightMotion: false,
     sideRegionPresent: false,
-    sideTabsPresent: false,
-    sideDockPresent: false,
     mobileDockCached: false,
   })
 
   const [elements, setElements] = createStore<{
-    side?: HTMLDivElement
+    middle?: HTMLDivElement
     bottomDock?: HTMLDivElement
   }>({})
 
-  const sideVisible = createMemo(() => isDesktop() && screen.side.layout().visible)
-  const sideDockVisible = createMemo(() => isDesktop() && screen.dock.side() && screen.dock.open())
-  const bottomDockVisible = createMemo(() => isDesktop() && screen.dock.open() && screen.dock.bottom())
-
-  const sidePresence = createAnimatedPresence(
-    () => sideVisible() || undefined,
-    () => elements.side ?? null,
+  const middlePresence = createAnimatedPresence(
+    () => screen.middle.open() || undefined,
+    () => elements.middle ?? null,
     session.layout.tabKey,
   )
 
-  const bottomDockPresence = createAnimatedPresence(
-    () => bottomDockVisible() || undefined,
+  const dockPresence = createAnimatedPresence(
+    () => screen.dock.open() || undefined,
     () => elements.bottomDock ?? null,
     session.layout.tabKey,
   )
 
-  const sideMotion = createMemo<{
-    key?: string
-    region: boolean
-    dock: boolean
-    animateRegion: boolean
-    animateDock: boolean
-  }>((previous) => {
+  const tabsMotion = createMemo<{ key?: string; tabs: boolean; animate: boolean }>((previous) => {
     const key = session.layout.tabKey()
-    const region = screen.side.region.open()
-    const dock = sideDockVisible()
+    const tabs = screen.middle.tabs.open()
     const sameTab = previous?.key === key
 
     return {
       key,
-      region,
-      dock,
-      animateRegion: !!previous && sameTab && previous.region !== region,
-      animateDock: !!previous && sameTab && previous.dock !== dock,
+      tabs,
+      animate: !!previous && sameTab && previous.tabs !== tabs,
     }
   })
-
-  const regionAnimating = () =>
-    sidePresence.animate() || sideMotion().animateRegion || sideMotion().animateDock || bottomDockPresence.animate()
 
   const trackSideWidthMotion = (event: TransitionEvent) => {
     if (event.currentTarget !== event.target || event.propertyName !== "width") return
@@ -167,21 +148,15 @@ function SessionScreenContent(props: {
   }
 
   createEffect(() => {
-    if (sideDockVisible()) setStore("sideDockPresent", true)
+    if (screen.dock.open()) setStore("bottomDockCached", true)
 
-    if (bottomDockVisible()) setStore("bottomDockCached", true)
-
-    if (!sideVisible()) setStore("sideHeightMotion", false)
+    if (screen.middle.tabs.open()) setStore("sideRegionPresent", true)
   })
   createEffect(() => {
-    if (!isDesktop() || screen.dock.bottom()) setStore("sideDockPresent", false)
-
-    if (isDesktop() && screen.dock.side()) setStore("bottomDockCached", false)
-  })
-  createEffect(() => {
-    if (screen.side.region.open()) setStore("sideRegionPresent", true)
-
-    if (screen.side.tabs.open()) setStore("sideTabsPresent", true)
+    if (!isDesktop()) {
+      setStore("bottomDockCached", false)
+      setStore("sideRegionPresent", false)
+    }
   })
 
   // The dock's narrow-screen view follows the dock's open state; other views are a selection.
@@ -260,7 +235,7 @@ function SessionScreenContent(props: {
           onSelectionInteraction={timeline.view.selectionInteraction}
           pinned={timeline.view.pinned()}
           centered={screen.centered()}
-          reserveReviewToggle={!sideVisible()}
+          reserveReviewToggle={isDesktop()}
           setContentRef={timeline.view.setContentRef}
           anchor={timeline.view.anchor}
           setRevealMessage={timeline.view.setRevealMessage}
@@ -368,11 +343,10 @@ function SessionScreenContent(props: {
     <>
       <div class="flex-1 min-h-0 flex flex-col gap-2 px-[var(--shell-inline-inset,8px)] pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]">
         <div ref={screen.panel.ref} class="relative flex-1 min-h-0 flex flex-col md:flex-row gap-2">
-          {/* Keep the control outside panel animations; a side dock's 52px header includes a 1px divider. */}
+          {/* Keep the control outside panel animations; it overlays the chat column's header corner. */}
           <Show when={isDesktop() && messagesReady() && session.identity.params.id}>
             <div
-              class="absolute end-3 top-0 z-30 flex items-center"
-              classList={{ "h-[51px]": sideDockVisible(), "h-12": !sideDockVisible() }}
+              class="absolute end-3 top-0 z-30 flex items-center h-12"
               data-slot="session-review-toggle"
               onPointerDown={hideTimelineScrollbar}
               onClick={hideTimelineScrollbar}
@@ -380,12 +354,139 @@ function SessionScreenContent(props: {
               <SessionReviewToggle />
             </div>
           </Show>
+
+          {/* Left column: the file tree, opened by the sidebar extensions. */}
+          <Show when={screen.files.open()}>
+            <div
+              id="file-tree-panel"
+              data-slot="file-tree-column"
+              class="relative min-w-0 shrink-0 h-full overflow-hidden rounded-[10px] bg-v2-background-bg-base shadow-[var(--v2-elevation-raised)] transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+              style={{ width: `${screen.files.width()}px` }}
+            >
+              <div class="h-full flex flex-col overflow-hidden group/filetree">
+                <ExtensionSlot
+                  at="session.panel.sidebar"
+                  input={{
+                    get session() {
+                      return props.view()
+                    },
+                    get screen() {
+                      return props.screen
+                    },
+                  }}
+                />
+              </div>
+              <div onPointerDown={() => screen.size.start()}>
+                <ResizeHandle
+                  class="-end-1"
+                  direction="horizontal"
+                  size={screen.files.width()}
+                  min={FILE_TREE_WIDTH_MIN}
+                  max={FILE_TREE_WIDTH_MAX}
+                  onResize={(width) => {
+                    screen.size.touch()
+                    screen.files.resize(width)
+                  }}
+                />
+              </div>
+            </div>
+          </Show>
+
+          {/* Middle column: the editor tab strip with the terminal dock at its bottom edge. */}
+          <Show when={middlePresence.present() || store.sideRegionPresent || store.bottomDockCached}>
+            <div
+              ref={(element) => setElements("middle", element)}
+              data-slot="session-side-panel-presence"
+              data-opened={middlePresence.animate() ? middlePresence.show() : undefined}
+              classList={{
+                "relative z-0 min-w-0 h-full flex-1 flex flex-col overflow-visible": middlePresence.present(),
+                "absolute inset-y-0 end-0 z-0 w-0 invisible pointer-events-none overflow-visible":
+                  !middlePresence.present(),
+              }}
+            >
+              <Show when={store.sideRegionPresent}>
+                {/* A closed region stays mounted at zero height while the dock keeps the column open. Once its
+                    close animation is over, hide it, or its frame's shadow draws a line over the dock. */}
+                <div
+                  data-slot="session-side-region-presence"
+                  data-opened={tabsMotion().animate ? tabsMotion().tabs : undefined}
+                  classList={{
+                    "relative min-h-0 overflow-visible": true,
+                    "flex-1": screen.middle.tabs.open(),
+                    "h-0 invisible pointer-events-none": !screen.middle.tabs.open(),
+                  }}
+                  onAnimationEnd={(event) => {
+                    if (event.currentTarget !== event.target) return
+
+                    if (event.animationName !== "side-region-presence-out") return
+
+                    if (screen.middle.tabs.open()) return
+
+                    setStore("sideRegionPresent", false)
+                  }}
+                >
+                  <SideRegion
+                    screen={props.screen}
+                    view={props.view()}
+                    region={region}
+                    sidebar={sidebar}
+                    present={store.sideRegionPresent}
+                    size={screen.size}
+                  />
+                </div>
+              </Show>
+
+              <Show when={store.bottomDockCached}>
+                <div
+                  ref={(element) => setElements("bottomDock", element)}
+                  data-slot="terminal-panel-presence"
+                  data-opened={dockPresence.animate() ? dockPresence.show() : undefined}
+                  classList={{
+                    hidden: !dockPresence.present(),
+                    "relative min-h-0 shrink-0 overflow-visible": true,
+                    "flex-1": !screen.middle.tabs.open(),
+                    "mt-2": screen.middle.tabs.open(),
+                  }}
+                >
+                  <Show when={screen.middle.tabs.open()}>
+                    <div class="absolute z-10 -top-1 left-0 right-0 h-2" onPointerDown={() => screen.size.start()}>
+                      <ResizeHandle
+                        class="!relative !inset-auto !h-full !w-full !transform-none"
+                        direction="vertical"
+                        size={session.layout.view().dock.height()}
+                        min={100}
+                        max={typeof window === "undefined" ? 600 : window.innerHeight * 0.6}
+                        collapseThreshold={50}
+                        onResize={(height) => {
+                          screen.size.touch()
+                          session.layout.view().dock.resize(height)
+                        }}
+                        onCollapse={() => session.layout.view().dock.close()}
+                      />
+                    </div>
+                  </Show>
+                  <DockRegion
+                    screen={props.screen}
+                    view={props.view()}
+                    sidebar={sidebar}
+                    stacked={screen.middle.tabs.open()}
+                    fill={!screen.middle.tabs.open()}
+                    present={store.bottomDockCached}
+                    animate={dockPresence.animate()}
+                    reserve={!screen.middle.tabs.open()}
+                  />
+                </div>
+              </Show>
+            </div>
+          </Show>
+
+          {/* Right column: the conversation. */}
           <div
             classList={{
               "@container relative z-10 min-w-0 shrink-0 flex flex-col min-h-0 h-full flex-1 md:flex-none transition-[width]": true,
               "duration-[240ms] ease-[cubic-bezier(0.4,0,0.2,1)] will-change-[width] motion-reduce:transition-none":
-                !screen.size.active() && sidePresence.animate(),
-              "transition-none": screen.size.active() || !sidePresence.animate(),
+                !screen.size.active() && middlePresence.animate(),
+              "transition-none": screen.size.active() || !middlePresence.animate(),
             }}
             data-slot="session-chat-panel"
             data-width-animating={store.sideWidthMotion}
@@ -408,8 +509,9 @@ function SessionScreenContent(props: {
             <Show when={screen.panel.resizable()}>
               <div onPointerDown={() => screen.size.start()}>
                 <ResizeHandle
-                  class="-end-1"
+                  class="-start-1"
                   direction="horizontal"
+                  edge="start"
                   size={screen.panel.resizedWidth()}
                   min={SESSION_PANEL_WIDTH_MIN}
                   max={screen.panel.max()}
@@ -421,173 +523,7 @@ function SessionScreenContent(props: {
               </div>
             </Show>
           </div>
-
-          <Show when={sidePresence.present() || store.sideTabsPresent || store.sideDockPresent}>
-            <div
-              ref={(element) => setElements("side", element)}
-              data-slot="session-side-panel-presence"
-              data-opened={sidePresence.animate() ? sidePresence.show() : undefined}
-              onAnimationEnd={(event) => {
-                if (event.currentTarget !== event.target) return
-
-                if (event.animationName !== "side-region-presence-in" || !sideVisible()) return
-                setStore("sideHeightMotion", true)
-              }}
-              classList={{
-                "relative z-0 min-w-0 h-full flex-1 overflow-visible": sidePresence.present(),
-                "absolute inset-y-0 end-0 z-0 w-0 invisible pointer-events-none overflow-visible":
-                  !sidePresence.present(),
-              }}
-            >
-              <div
-                data-slot="session-side-panel-content"
-                class="absolute inset-y-0 start-0 size-full"
-                style={{ "--session-side-content-width": screen.side.contentWidth() }}
-              >
-                <div
-                  data-slot="session-side-region"
-                  classList={{
-                    "absolute inset-x-0 top-0 min-h-0 overflow-visible transition-[height] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none": true,
-                    "will-change-[height]": !screen.size.active() && store.sideHeightMotion && regionAnimating(),
-                    "transition-none": screen.size.active() || !store.sideHeightMotion || !regionAnimating(),
-                  }}
-                  style={{ height: sideVisible() ? screen.side.region.height() : "100%" }}
-                >
-                  <Show when={store.sideRegionPresent}>
-                    {/* A closed region stays mounted at zero height while the side dock is open. Once its close
-                        animation is over, hide it, or its frame's shadow draws a flat line over the dock's top edge. */}
-                    <div
-                      data-slot="session-side-region-presence"
-                      data-opened={sideMotion().animateRegion ? sideMotion().region : undefined}
-                      class="absolute inset-0"
-                      classList={{ invisible: !screen.side.region.open() && !sideMotion().animateRegion }}
-                      onAnimationEnd={(event) => {
-                        if (event.currentTarget !== event.target) return
-
-                        if (event.animationName !== "side-region-presence-out") return
-
-                        if (screen.side.region.open()) return
-
-                        if (sideDockVisible()) return
-                        setStore("sideRegionPresent", false)
-                        setStore("sideTabsPresent", false)
-                      }}
-                    >
-                      <SideRegion
-                        screen={props.screen}
-                        view={props.view()}
-                        region={region}
-                        sidebar={sidebar}
-                        fileTree={screen.files.open()}
-                        present={store.sideTabsPresent}
-                        size={screen.size}
-                        stacked={screen.side.layout().stacked}
-                      />
-                    </div>
-                  </Show>
-                </div>
-                <div class="absolute start-0 bottom-0 flex flex-col" style={{ width: screen.side.contentWidth() }}>
-                  <div
-                    data-slot="session-side-panel-gap"
-                    classList={{
-                      "relative z-0 shrink-0 overflow-visible bg-v2-background-bg-deep transition-[height] duration-[40ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none": true,
-                      "delay-0": !screen.side.gap.closing(),
-                      "delay-[200ms]": screen.side.gap.closing(),
-                      "transition-none": !regionAnimating(),
-                    }}
-                    style={{ height: screen.side.gap.height() }}
-                    onPointerDown={() => screen.size.start()}
-                  >
-                    <Show when={screen.side.layout().stacked}>
-                      <ResizeHandle
-                        class="!relative !inset-auto !h-full !w-full !transform-none"
-                        direction="vertical"
-                        size={session.layout.view().dock.height()}
-                        min={100}
-                        max={typeof window === "undefined" ? 600 : window.innerHeight * 0.6}
-                        collapseThreshold={50}
-                        onResize={(height) => {
-                          screen.size.touch()
-                          session.layout.view().dock.resize(height)
-                        }}
-                        onCollapse={() => session.layout.view().dock.close()}
-                      />
-                    </Show>
-                  </div>
-                  <div
-                    data-slot="session-side-terminal-region"
-                    classList={{
-                      "relative z-10 min-h-0 shrink-0 overflow-visible transition-[height] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none": true,
-                      "will-change-[height]": !screen.size.active() && store.sideHeightMotion && regionAnimating(),
-                      "transition-none": screen.size.active() || !store.sideHeightMotion || !regionAnimating(),
-                    }}
-                    style={{ height: screen.side.dock.height() }}
-                  >
-                    <Show when={store.sideDockPresent}>
-                      <div
-                        data-slot="side-terminal-panel-presence"
-                        data-opened={sideMotion().animateDock ? sideMotion().dock : undefined}
-                        class="absolute inset-0 rounded-[10px] bg-v2-background-bg-base shadow-[var(--v2-elevation-raised)]"
-                      >
-                        <div data-slot="side-terminal-panel-clip" class="size-full overflow-clip rounded-[10px]">
-                          <DockRegion
-                            screen={props.screen}
-                            view={props.view()}
-                            sidebar={sidebar}
-                            fill
-                            framed={false}
-                            present={store.sideDockPresent}
-                            animate={sidePresence.animate() || sideMotion().animateDock}
-                            contentHeight={screen.side.dock.contentHeight()}
-                            reserve={!screen.side.region.open()}
-                          />
-                        </div>
-                      </div>
-                    </Show>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Show>
         </div>
-
-        <Show when={isDesktop() && (bottomDockPresence.present() || store.bottomDockCached)}>
-          <div
-            ref={(element) => setElements("bottomDock", element)}
-            data-slot="terminal-panel-presence"
-            data-opened={bottomDockPresence.animate() ? bottomDockPresence.show() : undefined}
-            classList={{
-              hidden: !bottomDockPresence.present(),
-              "relative min-h-0 shrink-0": isDesktop(),
-            }}
-          >
-            <Show when={isDesktop()}>
-              <div class="absolute z-10 -top-1 left-0 right-0 h-2" onPointerDown={() => screen.size.start()}>
-                <ResizeHandle
-                  class="!relative !inset-auto !h-full !w-full !transform-none"
-                  direction="vertical"
-                  size={session.layout.view().dock.height()}
-                  min={100}
-                  max={typeof window === "undefined" ? 600 : window.innerHeight * 0.6}
-                  collapseThreshold={50}
-                  onResize={(height) => {
-                    screen.size.touch()
-                    session.layout.view().dock.resize(height)
-                  }}
-                  onCollapse={() => session.layout.view().dock.close()}
-                />
-              </div>
-            </Show>
-            <DockRegion
-              screen={props.screen}
-              view={props.view()}
-              sidebar={sidebar}
-              stacked={isDesktop()}
-              present={store.bottomDockCached}
-              animate={bottomDockPresence.animate()}
-            />
-          </div>
-        </Show>
       </div>
     </>
   )

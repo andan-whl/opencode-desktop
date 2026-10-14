@@ -7,7 +7,6 @@ import type { useSettings } from "@/settings/model"
  * the current one, and a newer old id comes first, so its override wins over an older one.
  */
 export const keybindRenames = {
-  "app.checkForUpdates": "updater.check",
   "server.pair": "pairing.open",
   "server.ssh.add": "ssh.add",
   "debugBar.toggle": "debug.toggle",

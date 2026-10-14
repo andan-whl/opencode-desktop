@@ -17,8 +17,6 @@ import browser from "./browser"
 import browserRenderer from "./browser/renderer"
 import pairing from "./pairing"
 import pairingRenderer from "./pairing/renderer"
-import updater from "./updater"
-import updaterRenderer from "./updater/renderer"
 import ssh from "./ssh"
 import sshRenderer from "./ssh/renderer"
 import wsl from "./wsl"
@@ -45,7 +43,6 @@ export const builtins = Extension.compose(
   { ...details, renderer: eager(detailsRenderer) },
   { ...browser, renderer: eager(browserRenderer) },
   { ...pairing, renderer: eager(pairingRenderer) },
-  { ...updater, renderer: eager(updaterRenderer) },
   { ...ssh, renderer: eager(sshRenderer) },
   { ...wsl, renderer: eager(wslRenderer) },
   { ...microsoftOffice, renderer: eager(microsoftOfficeRenderer) },

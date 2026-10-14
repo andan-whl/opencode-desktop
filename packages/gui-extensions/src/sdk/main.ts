@@ -171,7 +171,7 @@ export interface ServerEndpoints {
 export interface Lifecycle {
   /**
    * Marks the app as quitting and disposes every extension but the one whose `keep` scope is passed (the caller's
-   * `ctx.scope` by default), then runs handoff (e.g. quitAndInstall) or relaunches. The kept scope outlives shutdown
+   * `ctx.scope` by default), then runs handoff or relaunches. The kept scope outlives shutdown
    * until the handoff settles, and keeps running when it fails (the promise rejects). Only an extension's `ctx.scope`
    * can be kept.
    *
@@ -180,7 +180,7 @@ export interface Lifecycle {
    *
    * @example
    * ```ts
-   * await ctx.lifecycle.restart(() => updater.quitAndInstall(), { keep: ctx.scope })
+   * await ctx.lifecycle.restart(install, { keep: ctx.scope })
    * ```
    */
   restart(
@@ -203,7 +203,7 @@ export interface Log {
    *
    * @example
    * ```ts
-   * ctx.log.write("warn", "update check failed", { error: String(cause) })
+   * ctx.log.write("warn", "probe failed", { error: String(cause) })
    * ```
    */
   write<Data extends Readonly<Record<string, unknown>>>(
@@ -347,7 +347,7 @@ export interface MainContext<D = never> extends BaseContext {
    *
    * @example
    * ```ts
-   * const provider = ctx.provide(Updater, { state: () => updater.state(), check, install })
+   * const provider = ctx.provide(Wsl, { state: () => controller.getState(), startServer })
    * ```
    */
   provide<S extends Extract<ProvidedSpec<D>, IpcSpec>>(token: Ipc<S>, impl: IpcImpl<S>): IpcProvider<S>

@@ -3,12 +3,10 @@
   "globalDependencies": [
     "patches/**",
     "bunfig.toml",
-    ".npmrc",
-    ".github/actions/setup-bun/**",
-    ".github/workflows/test.yml"
+    ".npmrc"
   ],
-  "globalEnv": ["CI", "OPENCODE_DISABLE_SHARE"],
-  "globalPassThroughEnv": ["CI", "OPENCODE_DISABLE_SHARE"],
+  "globalEnv": ["CI"],
+  "globalPassThroughEnv": ["CI"],
   "tasks": {
     "typecheck": {},
     "@opencode/cli#typecheck": {
@@ -17,9 +15,6 @@
     "test:components": {
       "outputs": [],
       "cache": false
-    },
-    "@opencode/enterprise#typecheck": {
-      "dependsOn": ["@opencode/core#typecheck"]
     },
     "@opencode/sdk#typecheck": {
       "dependsOn": ["@opencode/core#typecheck"]
@@ -47,9 +42,6 @@
     },
     "@opencode/core#test": {
       "dependsOn": ["^build"],
-      "outputs": []
-    },
-    "@opencode/function#test": {
       "outputs": []
     },
     "@opencode/desktop#test": {

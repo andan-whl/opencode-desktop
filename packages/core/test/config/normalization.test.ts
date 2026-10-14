@@ -651,7 +651,6 @@ describe("ConfigNormalize", () => {
   test("preserves explicit false, zero, empty list, and empty map presence", () => {
     const result = normalized({
       snapshot: false,
-      autoshare: false,
       references: {},
       commands: {},
       agents: {},
@@ -668,6 +667,5 @@ describe("ConfigNormalize", () => {
       instructions: [],
       experimental: { subagent_depth: 0 },
     })
-    expect(result.encoded.share).toBeUndefined()
   })
 })
