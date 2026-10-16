@@ -25,6 +25,17 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Bun does not reliably run electron's postinstall on a fresh CI install, but
+      # electron-builder's config reuses node_modules/electron/dist as the electron
+      # distribution, so extract it explicitly when the postinstall did not.
+      - name: Prepare Electron distribution
+        working-directory: packages/desktop
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "node_modules/electron/dist")) {
+            node node_modules/electron/install.js
+          }
+
       - name: Build CLI and package installer
         run: bun run --cwd packages/desktop package:full -- --win --publish never
 
