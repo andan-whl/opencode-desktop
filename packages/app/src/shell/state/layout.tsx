@@ -117,6 +117,10 @@ export const layoutSchema = Persistence.struct({
     // keeps telling current layouts from ones saved before the tab existed.
     tab: Schema.Literals(["changes", "all"]),
   }),
+  activity: Persistence.struct({
+    // The activity bar's selected view; the sidebar renders what it names.
+    view: Persistence.fallback(Schema.Literals(["explorer", "scm", "search"]), () => "explorer" as const),
+  }),
   session: Persistence.struct({ width: Schema.Finite }),
   mobileSidebar: Persistence.struct({ opened: Schema.Boolean }),
   sessionTabs: Persistence.record(Persistence.fallback(sessionTabsSchema, () => ({ all: [] }))),
@@ -159,15 +163,24 @@ export const layoutPersistence = Persistence.migrate(
         review: value.review
           ? { ...value.review, panelOpened: value.review.panelOpened ?? value.fileTree?.opened }
           : value.review,
-        fileTree:
-          value.fileTree && !value.fileTree.tab
-            ? {
-                ...value.fileTree,
-                opened: true,
-                width: value.fileTree.width === 260 ? DEFAULT_FILE_TREE_WIDTH : value.fileTree.width,
+        fileTree: (() => {
+          const stored = value.fileTree
+
+          if (!stored) return stored
+
+          // Layouts saved before the activity bar carry its era's closed-by-default flag, which nothing could
+          // reopen; the sidebar's source-control era opens the tree panel by default.
+          const opened = value.activity === undefined ? true : stored.opened
+
+          return stored.tab
+            ? { ...stored, opened }
+            : {
+                ...stored,
+                opened,
+                width: stored.width === 260 ? DEFAULT_FILE_TREE_WIDTH : stored.width,
                 tab: "changes" as const,
               }
-            : value.fileTree,
+        })(),
         sessionTabs: Object.fromEntries(
           Object.entries(value.sessionTabs)
             .filter(([key]) => SessionStateKey.is(key))
@@ -188,7 +201,8 @@ export function initialLayout(server?: ServerConnection.Key): typeof layoutSchem
     sidebar: { opened: false, width: DEFAULT_SIDEBAR_WIDTH, workspaces: {}, workspacesDefault: false },
     terminal: { height: DEFAULT_DOCK_HEIGHT, opened: false },
     review: { panelOpened: false },
-    fileTree: { opened: false, width: DEFAULT_FILE_TREE_WIDTH, tab: "changes" },
+    fileTree: { opened: true, width: DEFAULT_FILE_TREE_WIDTH, tab: "changes" },
+    activity: { view: "explorer" },
     session: { width: DEFAULT_SESSION_WIDTH },
     mobileSidebar: { opened: false },
     sessionTabs: {},
@@ -419,6 +433,18 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
           }
 
           setStore("fileTree", "width", width)
+        },
+      },
+      activity: {
+        view: createMemo(() => store.activity?.view ?? "explorer"),
+        setView(view: "explorer" | "scm" | "search") {
+          if (!store.activity) {
+            setStore("activity", { view })
+
+            return
+          }
+
+          setStore("activity", "view", view)
         },
       },
       session: {

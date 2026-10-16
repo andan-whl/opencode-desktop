@@ -25,6 +25,7 @@ import { useComments } from "@/composer/comments"
 import { useComposerState } from "@/composer/persistence"
 import { useServer } from "@/runtime/server/current"
 import { ServerConnection, serverName } from "@/runtime/server/registry"
+import { useLayout } from "@/shell/state/layout"
 import { sessionInWorkspace, sessionProject, type SessionModel } from "@/session/model"
 import { useFile } from "@/workspaces/files/model"
 import { useWorkspaceLocation } from "@/workspaces/location"
@@ -47,6 +48,7 @@ export function createMountedSession(session: SessionModel) {
   const server = useServer()
   const location = useWorkspaceLocation()
   const attachment = useExtensionAttachment()
+  const layout = useLayout()
   // The composer region owns background tasks and is created after the view.
   const [background, setBackground] = createSignal<Accessor<readonly BackgroundTask[]>>()
 
@@ -86,6 +88,16 @@ export function createMountedSession(session: SessionModel) {
   const files: Files = {
     get root() {
       return location().directory
+    },
+    view: {
+      get: () => layout.activity.view(),
+      set: (view) => layout.activity.setView(view),
+      open: (view) => {
+        batch(() => {
+          layout.activity.setView(view)
+          layout.fileTree.open()
+        })
+      },
     },
     ready: file.ready,
     resolve: file.normalize,

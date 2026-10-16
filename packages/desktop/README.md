@@ -18,23 +18,25 @@ bundle the assets as an application. The resulting app will be in `dist/`.
 bun run build && bun run package
 ```
 
-Production builds require a prebuilt V2 CLI distribution. The release workflow supplies the artifact from the same run:
+The bundled CLI always comes from this repository's `packages/cli` build, never from npm: the published `@opencode/*`
+packages are upstream builds whose protocol does not match this fork's renderer. Prebuild copies the CLI from
+`OPENCODE_CLI_DIST` when it is set, otherwise from `packages/cli/dist`, and fails with guidance when neither exists:
 
 ```bash
-OPENCODE_CHANNEL=prod OPENCODE_CLI_DIST=/absolute/path/to/packages/cli/dist bun run build
-OPENCODE_CHANNEL=prod bun run package
+bun run --cwd packages/cli build   # once, and after CLI changes
+bun run build && bun run package   # prod channel by default
 ```
+
+Set `OPENCODE_CHANNEL=dev` or `beta` to build a side-by-side identity instead.
 
 Set `OPENCODE_CLI_TARGET` when packaging for a different architecture. The CLI is placed outside `app.asar` in the
 application's resources directory, and packaging fails if it is missing.
 
 CLI preparation uses these channel rules:
 
-| Channel                                | Without `OPENCODE_CLI_DIST`    | With `OPENCODE_CLI_DIST`                      |
-| -------------------------------------- | ------------------------------ | --------------------------------------------- |
-| `dev`, `local`, unset, or unrecognized | Download the dev CLI           | Download the dev CLI; ignore the distribution |
-| `beta`                                 | Download the beta CLI          | Copy the supplied CLI; fail if it is missing  |
-| `prod`, `latest`                       | Fail before changing resources | Copy the supplied CLI; fail if it is missing  |
+| Channel      | CLI source                                                              |
+| ------------ | ----------------------------------------------------------------------- |
+| any / unset  | `OPENCODE_CLI_DIST` if set, else `packages/cli/dist`; fail if missing   |
 
 `bun dev` is separate from packaging: it uses local renderer/server mode, the dev app identity, and the CLI source by
 default. `bun dev --download-server <version>` instead downloads that CLI version for local development. Neither path

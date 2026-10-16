@@ -134,9 +134,10 @@ async function switchSession(page: Page, sessionID: string, title: string) {
 
 async function openReviewPane(page: Page) {
   await page.getByRole("button", { name: "Toggle review" }).click()
-  await expect(page.locator("#review-panel")).toBeVisible()
+  await expect(page.locator("#file-tree-panel")).toBeVisible()
   await page.waitForFunction(() => {
-    const text = document.querySelector("#review-panel")?.textContent ?? ""
+    // The source-control view shows the changed files with the selected file's diff below.
+    const text = document.querySelector("#file-tree-panel")?.textContent ?? ""
 
     return text.includes("generated-000.ts") && text.includes("+3")
   })

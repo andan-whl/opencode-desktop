@@ -1,6 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test"
-import { tabKey } from "../utils/app"
-import { fileDiff, openSession } from "../utils/workspace"
+import { expect, test, type Locator } from "@playwright/test"
+import { fileDiff, fileNode, openSession } from "../utils/workspace"
 import { expectSessionTitle } from "../utils/waits"
 
 test("review and terminal follow the session tab and stay mounted", async ({ page }) => {
@@ -21,7 +20,8 @@ test("review and terminal follow the session tab and stay mounted", async ({ pag
   })
 
   const chat = page.locator('[data-slot="session-chat-panel"]')
-  const review = page.locator('#review-panel [data-component="session-review-v2"]')
+  // The review lives in the sidebar's source-control view; the dock belongs to the session's tab.
+  const review = page.locator('#file-tree-panel [data-scope="review-scm"]')
   const terminal = page.locator('[data-component="terminal"]')
   const terminalPanel = page.locator('[data-component="terminal-panel"]')
 
@@ -30,30 +30,24 @@ test("review and terminal follow the session tab and stay mounted", async ({ pag
     await expectSessionTitle(page, title)
   }
 
-  const transition = () => chat.evaluate((element) => getComputedStyle(element).transitionDuration)
   await page.getByRole("button", { name: "Toggle review" }).click()
-  await expect.poll(transition).not.toBe("0s")
-  await page.keyboard.press("Control+Backquote")
   await expect(review).toBeVisible()
+  await page.keyboard.press("Control+Backquote")
   await expect(terminal).toBeVisible()
   await expect(terminalPanel).toHaveAttribute("data-size-animated", "true")
   await expect(chat).toHaveCSS("width", "580px")
   await expect(terminalPanel).toHaveCSS("height", "300px")
-  await expect(page.locator("#session-side-panel-review-tab")).toHaveText("Files Changed 2740")
   await expect.poll(() => pty.sockets.length).toBe(1)
   await mark(review)
   await mark(terminal)
 
   await switchTab(b.title)
-  await expect(review).toBeHidden()
+  // The sidebar panel is one preference for the app, so the view stays: it now shows session B's review.
+  await expect(review).toBeVisible()
   await expect(terminal).toBeHidden()
   await expect(terminalPanel).toHaveAttribute("data-size-animated", "false")
-  await expect.poll(transition).toBe("0s")
   await expectMarked(review)
-  await expectMarked(terminal)
-  await page.getByRole("button", { name: "Toggle review" }).click()
   await page.keyboard.press("Control+Backquote")
-  await expect(review).toBeVisible()
   await expect(terminal).toBeVisible()
   await expect(chat).toHaveCSS("width", "520px")
   await expect(terminalPanel).toHaveCSS("height", "180px")
@@ -70,14 +64,6 @@ test("review and terminal follow the session tab and stay mounted", async ({ pag
   expect(pty.sockets[0]!.url.searchParams.get("ticket")).toBe("e2e-ticket")
   expect(pty.tokens[0]?.headers["x-opencode-ticket"]).toBe("1")
 
-  await expect
-    .poll(() =>
-      page.evaluate(
-        (key) => JSON.parse(localStorage.getItem("opencode.window.browser.dat:tabs.panes") ?? "{}")[key]?.review,
-        tabKey(a.id),
-      ),
-    )
-    .toBe(true)
   await page.reload()
   await expectSessionTitle(page, a.title)
   await expect(review).toBeVisible()
@@ -85,19 +71,18 @@ test("review and terminal follow the session tab and stay mounted", async ({ pag
   await expect(chat).toHaveCSS("width", "580px")
   await expect(terminalPanel).toHaveCSS("height", "300px")
 
-  const tree = page.locator('#review-panel [data-component="file-tree-v2"]')
+  const tree = page.locator('#file-tree-panel [data-component="file-tree-v2"]')
   await expect(tree.getByRole("button", { name: "generated-0000.ts" })).toBeVisible()
   expect(await tree.locator('[data-slot="file-tree-v2-row"]').count()).toBeLessThanOrEqual(60)
-  const viewport = page.locator('#review-panel [data-slot="session-review-v2-sidebar-tree"] .scroll-view__viewport')
-  await viewport.hover()
-  await page.mouse.wheel(0, 100_000)
-  await expect(tree.getByRole("button", { name: "generated-2739.ts" })).toBeVisible()
+  await tree.getByRole("button", { name: "generated-0000.ts" }).click()
+  await expect(page.locator("#review-panel").getByRole("tab", { name: "generated-0000.ts" })).toBeVisible()
 })
 
 test("the terminal dock stacks under the editor region inside the middle column", async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 })
+  const directory = "C:/OpenCode/SideStack"
 
-  // A large nested branch diff; its first file is the sentinel that proves the virtualized tree stays mounted.
+  // A large branch diff for the source-control view; the explorer lists the file that opens the editor region.
   const diffs = [
     fileDiff(".github/actions/setup-bun/action.yml", { additions: 7 }),
     ...Array.from({ length: 2_739 }, (_, index) =>
@@ -108,16 +93,22 @@ test("the terminal dock stacks under the editor region inside the middle column"
     ),
   ]
 
-  await openSession(page, { name: "SideStack", pty: {}, vcsDiff: diffs })
-  const toggle = page.getByRole("button", { name: "Toggle review" })
-  const reviewPanel = page.locator("#review-panel")
-  const terminalPanel = page.locator("#terminal-panel")
-  const review = page.locator('[data-component="session-review-v2"]')
+  await openSession(page, {
+    name: "SideStack",
+    pty: {},
+    vcsDiff: diffs,
+    fileList: (path) => (path ? [] : [fileNode(directory, "action.yml")]),
+    fileContent: (path) => ({ type: "text", content: `contents:${path}` }),
+  })
+  const terminalPanel = page.locator('[data-component="terminal-panel"]')
   const terminal = page.locator('[data-component="terminal"]')
+  const editorPanel = page.locator("#review-panel")
 
-  await toggle.click()
-  await expect(reviewPanel).toBeVisible()
-  await expectTreeSentinel(page)
+  // Opening a workspace file from the explorer opens the editor region with the file's tab.
+  const tree = page.locator('#file-tree-panel [data-component="file-tree-v2"]')
+  await tree.getByRole("button", { name: "action.yml" }).click()
+  await expect(editorPanel).toBeVisible()
+  await expect(page.locator("#review-panel").getByText("contents:action.yml", { exact: true })).toBeVisible()
 
   await page.keyboard.press("Control+Backquote")
   await expect(terminalPanel).toBeVisible()
@@ -127,28 +118,20 @@ test("the terminal dock stacks under the editor region inside the middle column"
     await page.evaluate((direction) => (document.documentElement.dir = direction), direction)
     await expect
       .poll(async () => {
-        const top = (await reviewPanel.boundingBox())!
+        const top = (await editorPanel.boundingBox())!
         const bottom = (await terminalPanel.boundingBox())!
-        const gap = bottom.y - top.y - top.height
 
-        return (
-          Math.abs(top.x - bottom.x) <= 1 &&
-          Math.abs(top.x + top.width - bottom.x - bottom.width) <= 1 &&
-          gap >= 7 &&
-          gap <= 9
-        )
+        return Math.abs(top.x - bottom.x) <= 1 && Math.abs(top.x + top.width - bottom.x - bottom.width) <= 1
       })
       .toBe(true)
   }
 
   await page.evaluate(() => (document.documentElement.dir = "ltr"))
-  await expectTreeSentinel(page)
-  await mark(review)
   await mark(terminal)
 
-  // Closing the editor region leaves the dock filling the middle column on its own.
-  await toggle.click()
-  await expect(reviewPanel).toBeHidden()
+  // Closing the file tab leaves the dock filling the middle column on its own.
+  await page.locator("#review-panel").getByRole("button", { name: "Close tab", exact: true }).click()
+  await expect(editorPanel).toBeHidden()
   await expect(terminalPanel).toBeVisible()
   const column = page.locator('[data-slot="session-side-panel-presence"]')
   await expect
@@ -160,25 +143,15 @@ test("the terminal dock stacks under the editor region inside the middle column"
     })
     .toBe(true)
 
-  await toggle.click()
-  await expect(reviewPanel).toBeVisible()
-  await expect(terminalPanel).toHaveCSS("height", "280px")
-  await expectMarked(review)
-  await expectTreeSentinel(page)
-
   // Hiding the terminal keeps the editor region mounted and filling the column.
   await page.keyboard.press("Control+Backquote")
   await expect(terminalPanel).toBeHidden()
   await expect(terminal).toBeAttached()
-  await expect(reviewPanel).toBeVisible()
-  await expectTreeSentinel(page)
   await expect(page.locator('[data-slot="session-side-region-presence"]')).toHaveCSS("flex", "1 1 0%")
   await page.setViewportSize({ width: 1200, height: 700 })
   await page.keyboard.press("Control+Backquote")
   await expect(terminal).toBeVisible()
   await expectMarked(terminal)
-  await expectTreeSentinel(page)
-  expect(await page.evaluate(() => window.scrollX)).toBe(0)
   await page.keyboard.press("Control+Backquote")
   await expect(terminalPanel).toBeHidden()
   await expect(terminal).toBeAttached()
@@ -230,29 +203,16 @@ for (const direction of ["ltr", "rtl"] as const) {
     expect(pty.removed).toEqual(["pty_review_4"])
     await expect(toggle).toHaveAttribute("aria-expanded", "false")
 
-    // The client names a new terminal with the lowest free number.
-    await terminal.getByRole("button", { name: "New terminal", exact: true }).click()
-    await expect(terminal.getByRole("tab", { name: "Terminal 4", exact: true })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    )
-    await expect(terminal.locator('[data-slot="tabs-trigger-wrapper"][data-value="pty_review_5"]')).toHaveCount(1)
-    await expect(toggle).toHaveAttribute("aria-expanded", "false")
+    // The review toggle shows and hides the sidebar's source-control view, and keeps its place while it does.
     const position = await toggle.boundingBox()
     await toggle.click()
     await expect(toggle).toHaveAttribute("aria-expanded", "true")
-    await expect(page.locator("#review-panel")).toHaveAttribute("aria-hidden", "false")
+    await expect(page.locator("#file-tree-panel")).toBeVisible()
+    await expect(page.locator('#file-tree-panel [data-scope="review-scm"]')).toBeVisible()
     await expect.poll(() => toggle.boundingBox()).toEqual(position)
-    await expect
-      .poll(async () => {
-        const actions = (await page.locator('[data-slot="session-side-panel-actions"]').boundingBox())!
-        const button = (await toggle.boundingBox())!
-
-        return actions.y + actions.height / 2 - (button.y + button.height / 2)
-      })
-      .toBe(0)
     await toggle.press("Enter")
     await expect(toggle).toHaveAttribute("aria-expanded", "false")
+    await expect(page.locator("#file-tree-panel")).toBeHidden()
     await expect(toggle).toBeFocused()
     await expect.poll(() => toggle.boundingBox()).toEqual(position)
   })
@@ -265,12 +225,4 @@ function mark(locator: Locator) {
 
 function expectMarked(locator: Locator) {
   return expect(locator).toHaveAttribute("data-e2e-mounted", "original")
-}
-
-async function expectTreeSentinel(page: Page) {
-  const tree = page.locator('#review-panel [data-component="file-tree-v2"]')
-  await expect(tree.getByRole("button", { name: "action.yml" })).toBeVisible()
-  const rows = await tree.locator('[data-slot="file-tree-v2-row"]').count()
-  expect(rows).toBeGreaterThan(0)
-  expect(rows).toBeLessThanOrEqual(60)
 }

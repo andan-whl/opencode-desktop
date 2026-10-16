@@ -19,7 +19,6 @@ for (const direction of ["ltr", "rtl"] as const) {
     await page.goto(sessionHref(fixture.targetID))
     const header = page.locator("[data-session-title]")
     const more = header.getByRole("button", { name: "More options", exact: true })
-    const project = header.getByRole("button", { name: fixture.project.name, exact: true })
     const review = page.getByRole("button", { name: "Toggle review", exact: true })
     const details = header.getByRole("button", { name: "Session details", exact: true })
     await expect(header.getByRole("heading")).toHaveText(fixture.expected.targetTitle)
@@ -41,23 +40,21 @@ for (const direction of ["ltr", "rtl"] as const) {
       await expect(header.locator('[data-slot="session-title-child"]')).toHaveCSS("padding-right", "4px")
       await expect
         .poll(async () => {
-          const [icon, title, menu, sidebar, summary] = await Promise.all(
-            [project, header.locator('[data-slot="session-title-child"]'), more, review, details].map((control) =>
+          const [title, menu, sidebar, summary] = await Promise.all(
+            [header.locator('[data-slot="session-title-child"]'), more, review, details].map((control) =>
               control.boundingBox(),
             ),
           )
 
-          if (!icon || !title || !menu || !sidebar || !summary || !titleBounds) return false
+          if (!title || !menu || !sidebar || !summary || !titleBounds) return false
 
           if (Math.abs(title.y - titleBounds.y) > 0.5 || Math.abs(title.height - titleBounds.height) > 0.5) return false
 
           return direction === "ltr"
-            ? Math.abs(title.x - icon.x - icon.width - 2) <= 0.5 &&
-                Math.abs(menu.x - title.x - title.width - 2) <= 0.5 &&
+            ? Math.abs(menu.x - title.x - title.width - 2) <= 0.5 &&
                 menu.x + menu.width <= summary.x &&
                 summary.x + summary.width <= sidebar.x
-            : Math.abs(icon.x - title.x - title.width - 2) <= 0.5 &&
-                Math.abs(title.x - menu.x - menu.width - 2) <= 0.5 &&
+            : Math.abs(title.x - menu.x - menu.width - 2) <= 0.5 &&
                 sidebar.x + sidebar.width <= summary.x &&
                 summary.x + summary.width <= menu.x
         })
@@ -69,7 +66,7 @@ for (const direction of ["ltr", "rtl"] as const) {
 
     await review.click()
     await expect(review).toHaveAttribute("aria-expanded", "true")
-    await expect(page.locator("#review-panel")).toBeVisible()
+    await expect(page.locator("#file-tree-panel")).toBeVisible()
     await review.click()
     await expect(review).toHaveAttribute("aria-expanded", "false")
 

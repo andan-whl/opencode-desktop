@@ -247,8 +247,8 @@ test("the summary's changes row switches the view and keeps the side tabs", asyn
   // One click previews the file in place of the Open file tab.
   const panel = page.locator("#review-panel")
   const readme = panel.getByRole("tab", { name: "README.md", exact: true })
-  await page.getByRole("button", { name: "Toggle review", exact: true }).click()
-  await panel.getByRole("button", { name: "Open file", exact: true }).click()
+  await page.keyboard.press("Control+P")
+  await expect(panel.getByRole("tab", { name: "Open file", exact: true })).toHaveAttribute("aria-selected", "true")
   await panel.getByRole("button", { name: "README.md", exact: true }).click()
   await expect(readme).toHaveAttribute("aria-selected", "true")
   await expect(panel.getByRole("tab", { name: "Open file", exact: true })).toHaveCount(0)

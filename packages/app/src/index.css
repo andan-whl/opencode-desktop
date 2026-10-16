@@ -205,6 +205,32 @@
     padding: 2px;
   }
 
+  /* VS Code-style menubar: flat text triggers sitting in the titlebar drag region. */
+  [data-component="desktop-menubar"] {
+    gap: 2px;
+    /* Each trigger opts out individually; the bar keeps the drag region for empty space. */
+    -webkit-app-region: no-drag;
+  }
+
+  [data-component="desktop-menubar"] .desktop-menubar-trigger {
+    display: inline-flex;
+    height: 28px;
+    align-items: center;
+    padding-inline: 8px;
+    border-radius: 6px;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-regular);
+    color: var(--text-base);
+    cursor: default;
+  }
+
+  [data-component="desktop-menubar"] .desktop-menubar-trigger:hover,
+  [data-component="desktop-menubar"] .desktop-menubar-trigger:focus-visible,
+  [data-component="desktop-menubar"] .desktop-menubar-trigger[data-expanded] {
+    background: var(--v2-overlay-simple-overlay-hover);
+    outline: none;
+  }
+
   [data-component="menu-v2-content"].desktop-app-menu:not(.desktop-app-menu-sub) {
     width: 160px;
   }

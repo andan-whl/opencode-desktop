@@ -334,7 +334,8 @@ export function List<T>(props: ListProps<T> & { ref?: (ref: ListRef) => void }) 
                 icon={<Icon name="circle-x" />}
                 variant="ghost"
                 onClick={() => {
-                  setInternalFilter("")
+                  // Route through applyFilter so the filtered store resets together with the visible text.
+                  applyFilter("")
                   queueMicrotask(() => inputRef?.focus())
                 }}
                 aria-label={i18n.t("ui.list.clearFilter")}

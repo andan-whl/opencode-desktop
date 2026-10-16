@@ -11,6 +11,9 @@ export const FILE_TREE_WIDTH_MIN = 240
 
 export const FILE_TREE_WIDTH_MAX = 480
 
+/** The activity bar stays beside the tree column whenever the tree column can appear at all. */
+export const ACTIVITY_BAR_WIDTH = 48
+
 /** wide asks for the wider session minimum; sidebar is whether any extension fills the side panel sidebar. */
 export function createSessionScreenLayout(
   session: SessionModel,
@@ -27,16 +30,17 @@ export function createSessionScreenLayout(
   const dockOpen = createMemo(() => desktop() && view().dock.opened())
   const middleOpen = createMemo(() => tabsOpen() || dockOpen())
 
-  const fileTreeOpen = createMemo(
-    () => desktop() && input.sidebar() && settings.visibility.fileTree() && layout.fileTree.opened(),
-  )
+  // The activity bar is the tree column's permanent rail; the tree panel it selects opens beside it.
+  const activityBar = createMemo(() => desktop() && input.sidebar() && settings.visibility.fileTree())
+
+  const fileTreeOpen = createMemo(() => activityBar() && layout.fileTree.opened())
 
   const fileTreeWidth = createMemo(() =>
     Math.min(FILE_TREE_WIDTH_MAX, Math.max(FILE_TREE_WIDTH_MIN, layout.fileTree.width())),
   )
 
   // The chat column takes a stored width while any other column is open, and the full row otherwise.
-  const besideOpen = createMemo(() => fileTreeOpen() || middleOpen())
+  const besideOpen = createMemo(() => activityBar() || middleOpen())
 
   const [rowSize, setRowSize] = createStore<{ width?: number }>({})
   let row: HTMLDivElement | undefined
@@ -45,15 +49,22 @@ export function createSessionScreenLayout(
     ({ width }) => setRowSize({ width }),
   )
 
-  // What the row leaves for the chat column once the tree column and the gaps between visible columns are paid.
+  // What the row leaves for the chat column once the fused sidebar card and the gaps between whole columns are paid.
   const chatAvailable = createMemo<number | undefined>(() => {
     const width = rowSize.width
 
     if (width === undefined) return undefined
 
-    const columns = 1 + (fileTreeOpen() ? 1 : 0) + (middleOpen() ? 1 : 0)
+    // The bar and the panel it opens form one fused column, so only whole columns pay the gaps between them.
+    const columns = 1 + (activityBar() ? 1 : 0) + (middleOpen() ? 1 : 0)
 
-    return width - 8 - (fileTreeOpen() ? fileTreeWidth() : 0) - (columns - 1) * 8
+    return (
+      width -
+      8 -
+      (activityBar() ? ACTIVITY_BAR_WIDTH : 0) -
+      (fileTreeOpen() ? fileTreeWidth() : 0) -
+      (columns - 1) * 8
+    )
   })
 
   const splitSide = createMemo(() => tabsOpen() && input.wide())
@@ -79,6 +90,7 @@ export function createSessionScreenLayout(
   return {
     centered: desktop,
     files: {
+      bar: activityBar,
       open: fileTreeOpen,
       width: fileTreeWidth,
       resize: (width: number) => layout.fileTree.resize(width),

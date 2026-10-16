@@ -1,14 +1,15 @@
+import { Badge } from "@opencode/ui/badge"
 import { Button } from "@opencode/ui/button"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
-import { List } from "@opencode/ui/list"
+import { Spinner } from "@opencode/ui/spinner"
 import { Tabs } from "@opencode/ui/tabs"
 import { TextField } from "@opencode/ui/text-field"
 import { useMutation } from "@tanstack/solid-query"
 import type { SkillCatalogEntry, SkillInstallResult, SkillInstallSource } from "@opencode/client/promise"
-import { batch, createEffect, createMemo, createResource, For, Show, type Component } from "solid-js"
+import { batch, createEffect, createMemo, createResource, createSignal, For, Show, type Component } from "solid-js"
 import { createStore } from "solid-js/store"
 import { ExternalLink } from "@/runtime/platform/external-link"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -298,6 +299,19 @@ function DialogInstallSkill(props: { isManaged: (name: string) => boolean; onIns
   )
   const catalog = createMemo<SkillCatalogEntry[]>(() => catalogList.latest ?? [])
 
+  const [query, setQuery] = createSignal("")
+  const filtered = createMemo(() => {
+    const needle = query().trim().toLowerCase()
+    const entries = catalog().slice().sort((a, b) => a.name.localeCompare(b.name))
+    if (!needle) return entries
+    return entries.filter(
+      (entry) =>
+        entry.name.toLowerCase().includes(needle) ||
+        entry.description.toLowerCase().includes(needle) ||
+        entry.category.toLowerCase().includes(needle),
+    )
+  })
+
   const install = useMutation(() => ({
     mutationFn: (source: { type: InstallType; ref: string }) =>
       serverSdk.api.skill.install(source).then((result) => result.data),
@@ -335,7 +349,7 @@ function DialogInstallSkill(props: { isManaged: (name: string) => boolean; onIns
         />
       </DialogHeader>
       <DialogBody class="flex min-h-0 flex-1 flex-col gap-3">
-        <div class="px-3">
+        <div class="px-4">
           <Tabs
             variant="pill"
             value={form.type}
@@ -361,78 +375,127 @@ function DialogInstallSkill(props: { isManaged: (name: string) => boolean; onIns
             <Show
               when={!catalogList.loading}
               fallback={
-                <div class="flex flex-1 items-center justify-center text-12-regular text-v2-text-text-muted">
+                <div class="flex flex-1 items-center justify-center gap-2 text-12-regular text-v2-text-text-muted">
+                  <Spinner class="w-3.5" />
                   {language.t("common.loading")}
                   {language.t("common.loading.ellipsis")}
                 </div>
               }
             >
-              <List
-                class="min-h-0 flex-1"
-                search={{ placeholder: language.t("common.search.placeholder"), autofocus: true }}
-                emptyMessage={language.t("settings.skills.install.catalog.empty")}
-                key={(entry) => entry.name}
-                items={catalog()}
-                filterKeys={["name", "description", "category"]}
-                groupBy={(entry) => entry.category}
-                sortBy={(a, b) => a.name.localeCompare(b.name)}
-                sortGroupsBy={(a, b) => a.category.localeCompare(b.category)}
-                noInitialSelection
-                onSelect={(entry) => {
-                  if (!entry || install.isPending) return
-                  install.mutate({ type: "index", ref: entry.name })
-                }}
-              >
-                {(entry) => (
-                  <div class="flex min-w-0 w-full flex-col gap-0.5 py-1">
-                    <div class="flex items-center gap-2">
-                      <span class="truncate">{entry.name}</span>
-                      <Show when={props.isManaged(entry.name)}>
-                        <span class="shrink-0 text-11-regular text-v2-text-text-muted">
-                          {language.t("settings.skills.install.catalog.installed")}
-                        </span>
-                      </Show>
+              <div class="flex min-h-0 flex-1 flex-col gap-3">
+                <div class="settings-skill-search mx-4">
+                  <Icon name="magnifying-glass" class="shrink-0 text-v2-icon-icon-muted" />
+                  <TextField
+                    autofocus
+                    variant="ghost"
+                    class="flex-1"
+                    type="text"
+                    value={query()}
+                    onChange={setQuery}
+                    placeholder={language.t("common.search.placeholder")}
+                    spellcheck={false}
+                    autocorrect="off"
+                    autocomplete="off"
+                    autocapitalize="off"
+                  />
+                  <Show when={query()}>
+                    <IconButton
+                      icon={<Icon name="circle-x" />}
+                      variant="ghost"
+                      aria-label={language.t("common.clear")}
+                      onClick={() => setQuery("")}
+                    />
+                  </Show>
+                </div>
+                <Show
+                  when={filtered().length > 0}
+                  fallback={
+                    <div class="flex flex-1 items-center justify-center text-12-regular text-v2-text-text-muted">
+                      {language.t(
+                        query() ? "settings.skills.install.catalog.noMatch" : "settings.skills.install.catalog.empty",
+                      )}
                     </div>
-                    <span class="truncate text-11-regular text-v2-text-text-muted">{entry.description}</span>
+                  }
+                >
+                  <div class="settings-skill-grid min-h-0 flex-1 overflow-y-auto px-4 pb-1">
+                    <For each={filtered()}>
+                      {(entry) => (
+                        <div class="settings-skill-card">
+                          <div class="flex items-start gap-2.5">
+                            <Icon name="post-skill" class="mt-0.5 shrink-0 text-v2-icon-icon-muted" />
+                            <div class="flex min-w-0 flex-1 flex-col gap-1">
+                              <span class="settings-extension-name truncate">{entry.name}</span>
+                              <span class="line-clamp-2 text-11-regular text-v2-text-text-muted">
+                                {entry.description}
+                              </span>
+                            </div>
+                          </div>
+                          <div class="flex items-center justify-between gap-2">
+                            <Badge class="truncate">{entry.category}</Badge>
+                            <Button
+                              size="small"
+                              variant={props.isManaged(entry.name) ? "neutral" : "contrast"}
+                              disabled={props.isManaged(entry.name) || install.isPending}
+                              onClick={() => install.mutate({ type: "index", ref: entry.name })}
+                            >
+                              {language.t(
+                                props.isManaged(entry.name)
+                                  ? "settings.skills.install.catalog.installed"
+                                  : "settings.skills.install.catalog.install",
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </For>
                   </div>
-                )}
-              </List>
+                </Show>
+              </div>
             </Show>
           }
         >
           {(type) => (
-            <form onSubmit={submit} class="flex flex-col gap-4 px-3">
-              <TextField
-                autofocus
-                label={language.t(REF_LABELS[type])}
-                placeholder={language.t(REF_PLACEHOLDERS[type])}
-                value={form.ref}
-                onChange={(value) => {
-                  batch(() => {
-                    setForm("ref", value)
-                    setForm("error", undefined)
-                  })
-                }}
-                validationState={form.error ? "invalid" : undefined}
-                error={form.error}
-              />
-              <Button type="submit" variant="contrast" disabled={install.isPending} class="self-start">
-                {install.isPending
-                  ? language.t("settings.skills.install.installing")
-                  : language.t("settings.skills.install.button")}
-              </Button>
+            <form onSubmit={submit} class="flex min-h-0 flex-1 flex-col">
+              <div class="flex flex-1 flex-col justify-center gap-4 px-4 py-2">
+                <TextField
+                  autofocus
+                  label={language.t(REF_LABELS[type])}
+                  placeholder={language.t(REF_PLACEHOLDERS[type])}
+                  value={form.ref}
+                  onChange={(value) => {
+                    batch(() => {
+                      setForm("ref", value)
+                      setForm("error", undefined)
+                    })
+                  }}
+                  validationState={form.error ? "invalid" : undefined}
+                  error={form.error}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="neutral" onClick={() => dialog.close()}>
+                  {language.t("common.cancel")}
+                </Button>
+                <Button type="submit" variant="contrast" disabled={install.isPending}>
+                  {install.isPending
+                    ? language.t("settings.skills.install.installing")
+                    : language.t("settings.skills.install.button")}
+                </Button>
+              </DialogFooter>
             </form>
           )}
         </Show>
         <Show when={form.type === "index" && install.isPending}>
-          <span class="px-3 text-12-regular text-v2-text-text-muted">
+          <div class="flex items-center gap-2 px-4 text-12-regular text-v2-text-text-muted" role="status">
+            <Spinner class="w-3.5 shrink-0" />
             {language.t("settings.skills.install.installing")}
-          </span>
+          </div>
         </Show>
         <Show when={form.type === "index" && form.error}>
-          <span class="px-3 text-12-regular text-v2-state-fg-danger" role="alert">
+          <div class="flex items-center gap-2 px-4 text-12-regular text-v2-state-fg-danger" role="alert">
+            <Icon name="circle-x" class="shrink-0" />
             {form.error}
-          </span>
+          </div>
         </Show>
       </DialogBody>
     </Dialog>

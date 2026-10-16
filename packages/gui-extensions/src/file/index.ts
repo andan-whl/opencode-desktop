@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { Browser } from "../browser/contract"
-import { Changes } from "../review/contract"
+import { Changes, ScmView } from "../review/contract"
 import { Extension, Store } from "../sdk"
 import { OpenAppPreferences } from "./apps"
 import { FileTree, OpenInApp } from "./contract"
@@ -11,12 +11,15 @@ const TreeState = Schema.Struct({ tab: Schema.Literals(["changes", "all"]) })
 export default Extension.define({
   id: "file",
   provides: { tree: FileTree, openIn: OpenInApp },
-  // Without review the tree lists only the workspace files; without the browser, HTML opens as a file tab.
-  uses: { changes: Changes, browser: Browser },
+  // Without review the tree lists only the workspace files, and `scm` shows the plain changed-files tree; without
+  // the browser, HTML opens as a file tab.
+  uses: { changes: Changes, scm: ScmView, browser: Browser },
   stores: {
     tree: Store.global(
       TreeState,
-      { tab: "changes" },
+      // The workspace files are the everyday view; changes are a review-time detour. Projects without
+      // git would otherwise land on an empty changes tab with no way to browse files.
+      { tab: "all" },
       {
         key: "layout",
         pick: (value: { fileTree?: { tab?: unknown } } | null) => {

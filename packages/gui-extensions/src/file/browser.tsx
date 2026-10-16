@@ -1,9 +1,12 @@
-import { createMemo, createUniqueId, onCleanup, Show, type Accessor } from "solid-js"
+import { createMemo, createUniqueId, onCleanup, Show, type Accessor, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createQuery, keepPreviousData } from "@tanstack/solid-query"
-import { Icon } from "@opencode/ui/icon"
+import { useI18n } from "@opencode/ui/context/i18n"
+import { ScrollView } from "@opencode/ui/scroll-view"
+import { TextInput } from "@opencode/ui/text-input"
 import { SessionFilePanelV2, SessionFilePanelV2Empty } from "@opencode/session-ui/v2/session-file-panel-v2"
-import { SessionReviewV2Sidebar, SessionReviewV2SidebarToggle } from "@opencode/session-ui/v2/session-review-v2"
+import { SessionReviewV2Sidebar } from "@opencode/session-ui/v2/session-review-v2"
+import { Icon } from "@opencode/ui/icon"
 import { getFilename } from "@opencode/util/path"
 import type { ChangeKind } from "../review/contract"
 import {
@@ -11,7 +14,6 @@ import {
   useExtension,
   usePanel,
   type MountedSession,
-  type PanelSidebar,
   type PanelTab,
   type SessionScreen,
 } from "../sdk"
@@ -31,13 +33,13 @@ export function SessionFileBrowserTab(props: {
   placeholder: boolean
   active?: string
   kinds: ReadonlyMap<string, ChangeKind>
-  state: PanelSidebar
   onSelect: (path: string) => void
   onSelectPermanent: (path: string) => void
   filterRef?: (element: HTMLInputElement) => void
   mobile?: boolean
 }) {
   const ctx = useExtension()
+  const i18n = useI18n()
   const shared = useShared()
   const file = props.screen.file
   const resultsID = `session-file-browser-results-${createUniqueId()}`
@@ -45,7 +47,6 @@ export function SessionFileBrowserTab(props: {
   const filter = () => shared.filter.get(props.session.key)
   const setFilter = (value: string) => shared.filter.set(props.session.key, value)
   const setExplicitHighlight = (value: string) => setStore("explicitHighlight", value)
-  const sidebarOpened = () => props.placeholder || props.state.opened()
   const query = createMemo(() => filter().trim())
 
   const search = createQuery(() => {
@@ -101,102 +102,131 @@ export function SessionFileBrowserTab(props: {
     })
   }
 
-  // Keep the sidebar outside Kobalte Tabs.Content: a morphing content value
-  // unmounts the whole panel on every file-tab switch and resets sidebar scroll.
+  // The file tree and the filtered results, shared by the mobile sidebar and the desktop open-file view.
+  const list: JSX.Element = (
+    <Show
+      when={query()}
+      fallback={
+        <FileTreeV2
+          session={props.session}
+          screen={props.screen}
+          active={props.active}
+          kinds={props.kinds}
+          draggable={!props.mobile}
+          onFileClick={(node) => props.onSelect(node.path)}
+          onFileDoubleClick={(node) => props.onSelectPermanent(node.path)}
+        />
+      }
+    >
+      <Show
+        when={!loading()}
+        fallback={
+          <div role="status" class="px-2 py-2 text-12-regular text-text-weak">
+            {ctx.t("common.loading")}
+            {ctx.t("common.loading.ellipsis")}
+          </div>
+        }
+      >
+        <Show
+          when={files().length > 0}
+          fallback={
+            <div role="status" class="px-2 py-2 text-12-regular text-text-weak">
+              {ctx.t("palette.empty")}
+            </div>
+          }
+        >
+          <SessionFileList
+            session={props.session}
+            screen={props.screen}
+            id={resultsID}
+            role="listbox"
+            optionID={optionID}
+            files={files()}
+            kinds={props.kinds}
+            active={props.active}
+            highlighted={highlighted()}
+            onFileClick={(path) => {
+              setExplicitHighlight(path)
+              props.onSelect(path)
+            }}
+            onFileDoubleClick={props.onSelectPermanent}
+          />
+        </Show>
+      </Show>
+    </Show>
+  )
+
   return (
     <SessionFilePanelV2
-      toolbar={!props.mobile && !props.placeholder && !sidebarOpened()}
-      toolbarStart={<span class="truncate font-[530]">{title()}</span>}
-      sidebarCollapsed={!sidebarOpened()}
-      sidebarToggleGap={10}
-      sidebarToggle={
-        props.mobile ? undefined : (
-          <SessionReviewV2SidebarToggle
-            opened={sidebarOpened()}
-            disabled={props.placeholder}
-            onToggle={props.state.toggle}
-          />
-        )
-      }
+      // Only the narrow screen keeps a browsing sidebar; the desktop's explorer owns the tree.
       sidebar={
-        <SessionReviewV2Sidebar
-          open={sidebarOpened()}
-          transition={props.state.transition()}
-          title={<span class="truncate font-[530]">{title()}</span>}
-          filter={filter()}
-          onFilterChange={setFilter}
-          onFilterKeyDown={onFilterKeyDown}
-          filterAutofocus={props.placeholder && !props.mobile}
-          filterRef={(element) => props.filterRef?.(element)}
-          filterControls={resultsID}
-          filterActiveDescendant={highlighted() ? optionID(highlighted()!) : undefined}
-          filterExpanded={query().length > 0 && files().length > 0}
-          width={props.state.width()}
-          onWidthChange={props.mobile ? undefined : props.state.resize}
-        >
-          <Show
-            when={query()}
-            fallback={
-              <FileTreeV2
-                session={props.session}
-                screen={props.screen}
-                active={props.active}
-                kinds={props.kinds}
-                draggable={!props.mobile}
-                onFileClick={(node) => props.onSelect(node.path)}
-                onFileDoubleClick={(node) => props.onSelectPermanent(node.path)}
-              />
-            }
+        <Show when={props.mobile}>
+          <SessionReviewV2Sidebar
+            open
+            title={<span class="truncate font-[530]">{title()}</span>}
+            filter={filter()}
+            onFilterChange={setFilter}
+            onFilterKeyDown={onFilterKeyDown}
+            filterRef={props.filterRef}
+            filterControls={resultsID}
+            filterActiveDescendant={highlighted() ? optionID(highlighted()!) : undefined}
+            filterExpanded={query().length > 0 && files().length > 0}
           >
-            <Show
-              when={!loading()}
-              fallback={
-                <div role="status" class="px-2 py-2 text-12-regular text-text-weak">
-                  {ctx.t("common.loading")}
-                  {ctx.t("common.loading.ellipsis")}
-                </div>
-              }
-            >
-              <Show
-                when={files().length > 0}
-                fallback={
-                  <div role="status" class="px-2 py-2 text-12-regular text-text-weak">
-                    {ctx.t("palette.empty")}
-                  </div>
-                }
-              >
-                <SessionFileList
-                  session={props.session}
-                  screen={props.screen}
-                  id={resultsID}
-                  role="listbox"
-                  optionID={optionID}
-                  files={files()}
-                  kinds={props.kinds}
-                  active={props.active}
-                  highlighted={highlighted()}
-                  onFileClick={(path) => {
-                    setExplicitHighlight(path)
-                    props.onSelect(path)
-                  }}
-                  onFileDoubleClick={props.onSelectPermanent}
-                />
-              </Show>
-            </Show>
-          </Show>
-        </SessionReviewV2Sidebar>
+            {list}
+          </SessionReviewV2Sidebar>
+        </Show>
       }
     >
       <Show
         when={!props.placeholder}
         fallback={
-          <SessionFilePanelV2Empty>
-            <div class="flex flex-col items-center gap-2 text-center text-text-weak">
-              <Icon name="file-tree" size="large" class="mb-2" />
-              <div class="text-[13px] font-medium leading-[13px] text-text-strong">{ctx.t("command.open")}</div>
-              <div class="h-5 text-13-regular leading-5">{ctx.t("selectToOpen")}</div>
-            </div>
-          </SessionFilePanelV2Empty>
+          <Show
+            when={props.mobile}
+            fallback={
+              <div data-slot="session-open-file" class="flex h-full min-h-0 flex-col">
+                <div
+                  data-slot="session-open-file-title"
+                  class="truncate px-3 pb-1 pt-3 text-[13px] font-[530] leading-[var(--line-height-compact)] text-text-base"
+                >
+                  {title()}
+                </div>
+                <div class="shrink-0 px-3 pb-2">
+                  <TextInput
+                    type="search"
+                    value={filter()}
+                    onInput={(event) => setFilter(event.currentTarget.value)}
+                    onKeyDown={onFilterKeyDown}
+                    autofocus
+                    ref={(element) => props.filterRef?.(element)}
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-controls={resultsID}
+                    aria-activedescendant={highlighted() ? optionID(highlighted()!) : undefined}
+                    aria-expanded={query().length > 0 && files().length > 0}
+                    showClearButton={filter().length > 0}
+                    clearLabel={i18n.t("ui.list.clearFilter")}
+                    onClearClick={() => setFilter("")}
+                    placeholder={i18n.t("ui.sessionReviewV2.filterFiles")}
+                    aria-label={i18n.t("ui.sessionReviewV2.filterFiles")}
+                    leadingIcon={<Icon name="magnifying-glass" size="small" />}
+                  />
+                </div>
+                <div class="min-h-0 flex-1 overflow-hidden px-3 pb-3">
+                  <ScrollView class="group/file-tree-v2 h-full" orientation="both" thumbVisibility="scroll">
+                    {list}
+                  </ScrollView>
+                </div>
+              </div>
+            }
+          >
+            <SessionFilePanelV2Empty>
+              <div class="flex flex-col items-center gap-2 text-center text-text-weak">
+                <Icon name="file-tree" size="large" class="mb-2" />
+                <div class="text-[13px] font-medium leading-[13px] text-text-strong">{ctx.t("command.open")}</div>
+                <div class="h-5 text-13-regular leading-5">{ctx.t("selectToOpen")}</div>
+              </div>
+            </SessionFilePanelV2Empty>
+          </Show>
         }
       >
         <div class="min-h-0 flex-1">
@@ -261,7 +291,6 @@ export default function FileBrowser(props: {
       placeholder={placeholder()}
       active={placeholder() ? undefined : fileTabPath(props.screen.file, id())}
       kinds={changes()?.kinds(props.session) ?? empty}
-      state={panel.sidebar}
       onSelect={(path) => shared.open(props.session, path, { tab: "preview" })}
       onSelectPermanent={(path) => shared.open(props.session, path)}
       filterRef={(element) => {

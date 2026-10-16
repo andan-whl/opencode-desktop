@@ -188,6 +188,8 @@ import type {
   FileListOutput,
   FileFindInput,
   FileFindOutput,
+  FileGrepInput,
+  FileGrepOutput,
   CommandListInput,
   CommandListOutput,
   SkillListInput,
@@ -1222,7 +1224,25 @@ const EndpointFileFind = (raw: RawClient["server.fs"]) => (input: FileFindInput)
     }).pipe(Effect.mapError(mapClientError)),
   )
 
-const adaptGroupFile = (raw: RawClient["server.fs"]) => ({ list: EndpointFileList(raw), find: EndpointFileFind(raw) })
+const EndpointFileGrep = (raw: RawClient["server.fs"]) => (input: FileGrepInput) =>
+  preserveEffect<FileGrepOutput>()(
+    raw["fs.grep"]({
+      query: {
+        location: input["location"],
+        pattern: input["pattern"],
+        include: input["include"],
+        literal: input["literal"],
+        caseSensitive: input["caseSensitive"],
+        limit: input["limit"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const adaptGroupFile = (raw: RawClient["server.fs"]) => ({
+  list: EndpointFileList(raw),
+  find: EndpointFileFind(raw),
+  grep: EndpointFileGrep(raw),
+})
 
 const EndpointCommandList = (raw: RawClient["server.command"]) => (input?: CommandListInput) =>
   preserveEffect<CommandListOutput>()(

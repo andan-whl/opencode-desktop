@@ -1770,9 +1770,21 @@ export type FileFindInput = {
 export type FileFindOutput = { readonly location: Location.PublicRef; readonly data: ReadonlyArray<FileSystem.Entry> }
 export type FileFindOperation<E = never> = (input: FileFindInput) => Effect.Effect<FileFindOutput, E>
 
+export type FileGrepInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly pattern: string
+  readonly include?: string | undefined
+  readonly literal?: boolean | undefined
+  readonly caseSensitive?: boolean | undefined
+  readonly limit?: number | undefined
+}
+export type FileGrepOutput = { readonly location: Location.PublicRef; readonly data: ReadonlyArray<FileSystem.Match> }
+export type FileGrepOperation<E = never> = (input: FileGrepInput) => Effect.Effect<FileGrepOutput, E>
+
 export interface FileApi<E = never> {
   readonly list: FileListOperation<E>
   readonly find: FileFindOperation<E>
+  readonly grep: FileGrepOperation<E>
 }
 
 export type CommandListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }

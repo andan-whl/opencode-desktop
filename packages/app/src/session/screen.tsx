@@ -28,6 +28,7 @@ import { createMountedSession } from "@/runtime/extension/mounted-session"
 import { useUsageExceededDialogs } from "./usage-exceeded-dialogs"
 import { SessionErrorFallback } from "./route-error"
 import { createSessionScreenLayout, FILE_TREE_WIDTH_MIN, FILE_TREE_WIDTH_MAX } from "./screen-layout"
+import { SessionActivityBar } from "./activity-bar"
 import { SideRegion } from "@/runtime/extension/side-region"
 import { createSessionTimelineInteraction } from "./timeline/interaction"
 import { createTimelineSearchController } from "./timeline/search-controller"
@@ -355,40 +356,48 @@ function SessionScreenContent(props: {
             </div>
           </Show>
 
-          {/* Left column: the file tree, opened by the sidebar extensions. */}
-          <Show when={screen.files.open()}>
-            <div
-              id="file-tree-panel"
-              data-slot="file-tree-column"
-              class="relative min-w-0 shrink-0 h-full overflow-hidden rounded-[10px] bg-v2-background-bg-base shadow-[var(--v2-elevation-raised)] transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
-              style={{ width: `${screen.files.width()}px` }}
-            >
-              <div class="h-full flex flex-col overflow-hidden group/filetree">
-                <ExtensionSlot
-                  at="session.panel.sidebar"
-                  input={{
-                    get session() {
-                      return props.view()
-                    },
-                    get screen() {
-                      return props.screen
-                    },
-                  }}
-                />
+          {/* Left column: the activity bar and the tree panel it selects share one fused sidebar card. */}
+          <Show when={screen.files.bar()}>
+            <div class="relative flex h-full min-w-0 shrink-0">
+              <div class="flex h-full min-w-0 overflow-hidden rounded-[10px] bg-v2-background-bg-base shadow-[var(--v2-elevation-raised)]">
+                <SessionActivityBar />
+                <Show when={screen.files.open()}>
+                  <div
+                    id="file-tree-panel"
+                    data-slot="file-tree-column"
+                    class="relative min-w-0 shrink-0 h-full overflow-hidden transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+                    style={{ width: `${screen.files.width()}px` }}
+                  >
+                    <div class="h-full flex flex-col overflow-hidden group/filetree">
+                      <ExtensionSlot
+                        at="session.panel.sidebar"
+                        input={{
+                          get session() {
+                            return props.view()
+                          },
+                          get screen() {
+                            return props.screen
+                          },
+                        }}
+                      />
+                    </div>
+                  </div>
+                </Show>
               </div>
-              <div onPointerDown={() => screen.size.start()}>
-                <ResizeHandle
-                  class="-end-1"
-                  direction="horizontal"
-                  size={screen.files.width()}
-                  min={FILE_TREE_WIDTH_MIN}
-                  max={FILE_TREE_WIDTH_MAX}
-                  onResize={(width) => {
-                    screen.size.touch()
-                    screen.files.resize(width)
-                  }}
-                />
-              </div>
+              <Show when={screen.files.open()}>
+                <div onPointerDown={() => screen.size.start()}>
+                  <ResizeHandle
+                    direction="horizontal"
+                    size={screen.files.width()}
+                    min={FILE_TREE_WIDTH_MIN}
+                    max={FILE_TREE_WIDTH_MAX}
+                    onResize={(width) => {
+                      screen.size.touch()
+                      screen.files.resize(width)
+                    }}
+                  />
+                </div>
+              </Show>
             </div>
           </Show>
 
@@ -509,7 +518,6 @@ function SessionScreenContent(props: {
             <Show when={screen.panel.resizable()}>
               <div onPointerDown={() => screen.size.start()}>
                 <ResizeHandle
-                  class="-start-1"
                   direction="horizontal"
                   edge="start"
                   size={screen.panel.resizedWidth()}

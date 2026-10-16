@@ -1,6 +1,6 @@
 import { createContext, useContext, type Accessor } from "solid-js"
 import type { Browser } from "../browser/contract"
-import type { Changes } from "../review/contract"
+import type { Changes, ScmView } from "../review/contract"
 import type { LineRange, Live, MountedSession, OpenOptions } from "../sdk"
 import type { OpenApp } from "./apps"
 
@@ -31,6 +31,8 @@ export interface FileDraft {
 export interface FileShared {
   readonly changes: Accessor<Live<Changes>>
   readonly browser: Accessor<Live<Browser>>
+  /** The review's source-control view, shown in the sidebar's `scm` view while the review extension is active. */
+  readonly scm: Accessor<Live<ScmView>>
   readonly tree: {
     tab(): TreeTab
     setTab(tab: TreeTab): void

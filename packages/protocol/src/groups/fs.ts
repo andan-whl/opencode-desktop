@@ -1,9 +1,9 @@
 import { FileSystem } from "@opencode/schema/filesystem"
 import { Location } from "@opencode/schema/location"
 import { PositiveInt } from "@opencode/schema/schema"
-import { Schema } from "effect"
+import { Schema, SchemaGetter } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/http-api"
-import { FileNotFoundError } from "../errors.js"
+import { FileNotFoundError, InvalidRequestError } from "../errors.js"
 import { LocationQuery, locationQueryOpenApi } from "./location.js"
 
 const ListQuery = Schema.Struct({
@@ -25,6 +25,27 @@ const FindQuery = Schema.Struct({
   ...LocationQuery.fields,
   query: FileSystem.FindInput.fields.query,
   type: FileSystem.FindInput.fields.type,
+  limit: Schema.NumberFromString.pipe(Schema.decodeTo(PositiveInt), Schema.optional),
+})
+
+// effect 4 ships no BooleanFromString; query strings carry booleans as "true"/"false".
+const BooleanFromString = Schema.Literals(["true", "false"]).pipe(
+  Schema.decodeTo(Schema.Boolean, {
+    decode: SchemaGetter.transform((value) => value === "true"),
+    encode: SchemaGetter.transform((value) => (value ? "true" : "false")),
+  }),
+)
+
+const GrepQuery = Schema.Struct({
+  ...LocationQuery.fields,
+  pattern: Schema.String.annotate({ description: "Regex pattern, or a literal when literal is true." }),
+  include: Schema.String.pipe(Schema.optional).annotate({
+    description: "Optional glob restricting which files are searched, e.g. *.ts",
+  }),
+  literal: Schema.optional(BooleanFromString).annotate({ description: "Match the pattern literally." }),
+  caseSensitive: Schema.optional(BooleanFromString).annotate({
+    description: "Defaults to case-sensitive matching.",
+  }),
   limit: Schema.NumberFromString.pipe(Schema.decodeTo(PositiveInt), Schema.optional),
 })
 
@@ -72,6 +93,22 @@ export const FileSystemGroup = HttpApiGroup.make("server.fs")
           identifier: "fs.find",
           summary: "Find files",
           description: "Find recursively ranked filesystem entries relative to the requested location.",
+        }),
+      ),
+  )
+  .add(
+    HttpApiEndpoint.get("fs.grep", "/api/fs/grep", {
+      query: GrepQuery,
+      success: Location.response(Schema.Array(FileSystem.Match)),
+      error: InvalidRequestError,
+    })
+      .annotateMerge(locationQueryOpenApi)
+      .annotateMerge(
+        OpenApi.annotations({
+          identifier: "fs.grep",
+          summary: "Search file content",
+          description:
+            "Search file content with a regex (or literal) pattern relative to the requested location, returning matches with line numbers and submatch offsets.",
         }),
       ),
   )

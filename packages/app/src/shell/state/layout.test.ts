@@ -34,7 +34,8 @@ describe("layout persistence", () => {
       sidebar: { opened: false, width: 344, workspaces: {}, workspacesDefault: false },
       terminal: { height: 280, opened: false },
       review: { panelOpened: false },
-      fileTree: { opened: false, width: 200, tab: "changes" },
+      fileTree: { opened: true, width: 200, tab: "changes" },
+      activity: { view: "explorer" },
       session: { width: 600 },
       mobileSidebar: { opened: false },
       sessionTabs: {},
@@ -62,6 +63,17 @@ describe("layout persistence", () => {
     const current = decode({ review: { panelOpened: false }, fileTree: { opened: true, width: 260, tab: "all" } })
     expect(current.review).toEqual({ panelOpened: false })
     expect(current.fileTree).toEqual({ opened: true, width: 260, tab: "all" })
+  })
+
+  test("reopens the tree panel for layouts saved before the activity bar, and keeps later choices", () => {
+    // The pre-activity-bar era stored the closed flag nothing could reopen.
+    const before = decode({ fileTree: { opened: false, width: 240, tab: "changes" } })
+    expect(before.fileTree).toEqual({ opened: true, width: 240, tab: "changes" })
+
+    // A layout the activity bar wrote keeps its stored choice.
+    const after = decode({ activity: { view: "search" }, fileTree: { opened: false, width: 240, tab: "changes" } })
+    expect(after.fileTree).toEqual({ opened: false, width: 240, tab: "changes" })
+    expect(after.activity).toEqual({ view: "search" })
   })
 
   test("distinguishes an invalid panel field from an invalid review section", () => {

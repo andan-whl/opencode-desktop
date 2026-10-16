@@ -5,12 +5,14 @@ import { Keybind } from "@opencode/ui/keybind"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
-import { useSessionLayout } from "@/session/session-layout"
+import { useLayout } from "@/shell/state/layout"
 
 export function SessionReviewToggle() {
   const command = useCommand()
   const language = useLanguage()
-  const { view } = useSessionLayout()
+  const layout = useLayout()
+  // The review lives in the sidebar's source-control view: the toggle shows or hides that view.
+  const opened = () => layout.activity.view() === "scm" && layout.fileTree.opened()
 
   return (
     <SessionHeaderActions
@@ -18,8 +20,13 @@ export function SessionReviewToggle() {
         reviewLabel: language.t("command.review.toggle"),
         reviewKeybind: command.keybindParts("review.toggle"),
         reviewVisible: true,
-        reviewOpened: view().side.opened(),
-        onReviewToggle: () => view().side.toggle(),
+        reviewOpened: opened(),
+        onReviewToggle: () => {
+          if (opened()) return layout.fileTree.close()
+
+          layout.activity.setView("scm")
+          layout.fileTree.open()
+        },
       }}
     />
   )
@@ -63,7 +70,7 @@ export function SessionHeaderActions(props: { state: SessionHeaderActionsState }
             onClick={props.state.onReviewToggle}
             aria-label={props.state.reviewLabel}
             aria-expanded={props.state.reviewOpened}
-            aria-controls="review-panel"
+            aria-controls="file-tree-panel"
             icon={<Icon name="sidebar-right" />}
           />
         </Tooltip>

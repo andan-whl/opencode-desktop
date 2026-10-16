@@ -1,8 +1,6 @@
 import { makeEventListener } from "@solid-primitives/event-listener"
-import { For, onMount, type JSX } from "solid-js"
+import { For, onMount } from "solid-js"
 import { Menu } from "@opencode/ui/menu"
-import { Icon } from "@opencode/ui/icon"
-import { IconButton } from "@opencode/ui/icon-button"
 
 import { matchKeybind, parseKeybind, useCommand } from "@/shell/commands/command"
 import {
@@ -106,81 +104,56 @@ export function WindowsAppMenu(props: {
   })
 
   return (
-    <Menu appearance="standard" gutter={4} modal={false} placement="bottom-start">
-      <div
-        data-component="desktop-icon-button"
-        class="flex h-7 w-9 shrink-0 items-center justify-center rounded-[6px] px-1"
-      >
-        <Menu.Trigger
-          as={IconButton}
-          variant="ghost-muted"
-          size="large"
-          icon={<Icon name="menu" />}
-          aria-label={language.t("desktop.menu.ariaLabel")}
-          onPointerDown={rememberFocus}
-          onKeyDown={rememberFocus}
-        />
-      </div>
-      <Menu.Portal>
-        <Menu.Content class="desktop-app-menu">
-          <Menu.Group>
-            <Menu.GroupLabel class="desktop-app-menu-heading">OpenCodeDesktop</Menu.GroupLabel>
-            <For each={DESKTOP_MENU.filter((menu) => desktopMenuVisible(menu, "windows"))}>
-              {(menu) => (
-                <DesktopMenuSubmenu label={language.t(menu.labelKey)}>
-                  <For each={entries(menu)}>
-                    {(item) => {
-                      const entry = item.entry
+    <div data-component="desktop-menubar" class="flex shrink-0 items-center">
+      <For each={DESKTOP_MENU.filter((menu) => desktopMenuVisible(menu, "windows"))}>
+        {(menu) => (
+          <Menu appearance="standard" gutter={4} modal={false} placement="bottom-start">
+            <Menu.Trigger class="desktop-menubar-trigger" onPointerDown={rememberFocus} onKeyDown={rememberFocus}>
+              {language.t(menu.labelKey)}
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content class="desktop-app-menu">
+                <For each={entries(menu)}>
+                  {(item) => {
+                    const entry = item.entry
 
-                      // Static menu data: an early return keeps the union narrowing a Show fallback would lose.
-                      if ("menu" in entry)
-                        return (
-                          <DesktopMenuItem
-                            label={entry.label}
-                            disabled={!entry.enabled}
-                            onSelect={() => menubar?.run(entry.id)}
-                          />
-                        )
-
-                      if (entry.type === "separator") return <Menu.Separator />
-
-                      // Plain accessors rather than conditional JSX expressions, which compile to memos created
-                      // where the menu reads the prop, possibly outside this owner.
-                      const label = () => (entry.labelKey ? language.t(entry.labelKey) : "")
-
-                      const keybind = () =>
-                        entry.command ? props.command.keybind(entry.command) : entry.accelerator?.windows
-
-                      const disabled = () => (entry.command ? commandDisabled(entry.command) : false)
-
+                    // Static menu data: an early return keeps the union narrowing a Show fallback would lose.
+                    if ("menu" in entry)
                       return (
                         <DesktopMenuItem
-                          label={label()}
-                          keybind={keybind()}
-                          disabled={disabled()}
-                          onSelect={() => runEntry(entry)}
+                          label={entry.label}
+                          disabled={!entry.enabled}
+                          onSelect={() => menubar?.run(entry.id)}
                         />
                       )
-                    }}
-                  </For>
-                </DesktopMenuSubmenu>
-              )}
-            </For>
-          </Menu.Group>
-        </Menu.Content>
-      </Menu.Portal>
-    </Menu>
-  )
-}
 
-function DesktopMenuSubmenu(props: { label: string; children: JSX.Element }) {
-  return (
-    <Menu.Sub>
-      <Menu.SubTrigger>{props.label}</Menu.SubTrigger>
-      <Menu.Portal>
-        <Menu.SubContent class="desktop-app-menu desktop-app-menu-sub">{props.children}</Menu.SubContent>
-      </Menu.Portal>
-    </Menu.Sub>
+                    if (entry.type === "separator") return <Menu.Separator />
+
+                    // Plain accessors rather than conditional JSX expressions, which compile to memos created
+                    // where the menu reads the prop, possibly outside this owner.
+                    const label = () => (entry.labelKey ? language.t(entry.labelKey) : "")
+
+                    const keybind = () =>
+                      entry.command ? props.command.keybind(entry.command) : entry.accelerator?.windows
+
+                    const disabled = () => (entry.command ? commandDisabled(entry.command) : false)
+
+                    return (
+                      <DesktopMenuItem
+                        label={label()}
+                        keybind={keybind()}
+                        disabled={disabled()}
+                        onSelect={() => runEntry(entry)}
+                      />
+                    )
+                  }}
+                </For>
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu>
+        )}
+      </For>
+    </div>
   )
 }
 

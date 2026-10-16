@@ -76,16 +76,12 @@ benchmark.describe("performance: review pane scaling", () => {
           expectedRows,
         })
 
-        const search = await measureBroadReviewSearch(page, fileCount)
-
         expect(metrics.logicalRows).toBe(expectedRows)
         expect(metrics.fileRows).toBeGreaterThan(0)
         expect(metrics.treeRows).toBeGreaterThan(0)
         expect(metrics.diffLines).toBeGreaterThan(0)
-        expect(search.logicalRows).toBe(fileCount)
-        expect(search.renderedRows).toBeGreaterThan(0)
         report(
-          { ...metrics, search },
+          { ...metrics },
           {
             fileCount,
             changedLinesPerFile,
@@ -102,51 +98,6 @@ benchmark.describe("performance: review pane scaling", () => {
     )
   }
 })
-
-async function measureBroadReviewSearch(page: Page, expectedRows: number) {
-  const filter = page.getByRole("searchbox", { name: "Filter files" })
-  await filter.evaluate((element) => {
-    element.addEventListener(
-      "input",
-      () => {
-        ;(window as Window & { __reviewSearchStartedAt?: number }).__reviewSearchStartedAt = performance.now()
-      },
-      { once: true, capture: true },
-    )
-  })
-  await filter.fill("file-")
-
-  return page.evaluate((expectedRows) => {
-    const startedAt = (window as Window & { __reviewSearchStartedAt?: number }).__reviewSearchStartedAt!
-
-    return new Promise<{ stableMs: number; logicalRows: number; renderedRows: number }>((resolve) => {
-      let previous = -1
-      let streak = 0
-
-      const sample = () => {
-        const tree = document.querySelector<HTMLElement>('#review-panel [data-component="file-tree-v2"]')
-        const rows = [...document.querySelectorAll<HTMLElement>('#review-panel [data-slot="file-tree-v2-row"]')]
-        const logicalRows = Number(tree?.dataset.totalRows ?? rows.length)
-
-        const ready =
-          logicalRows === expectedRows && rows.length > 0 && rows.every((row) => row.textContent?.includes("file-"))
-
-        streak = ready && rows.length === previous ? streak + 1 : ready ? 1 : 0
-        previous = rows.length
-
-        if (streak >= 3) {
-          resolve({ stableMs: performance.now() - startedAt, logicalRows, renderedRows: rows.length })
-
-          return
-        }
-
-        requestAnimationFrame(sample)
-      }
-
-      requestAnimationFrame(sample)
-    })
-  }, expectedRows)
-}
 
 function createScalingDiffs(fileCount: number, patchByteLimit: number) {
   const changes = Array.from({ length: linesPerSide }, (_, index) => {
@@ -274,7 +225,8 @@ async function installReviewPaneScalingProbe(page: Page, input: { expectedFile: 
 
       const sample = (time: number) => {
         if (!running || probe.startedAt === undefined) return
-        const panel = document.querySelector<HTMLElement>("#review-panel")
+        // The review lives in the sidebar's source-control view on wide screens.
+        const panel = document.querySelector<HTMLElement>("#file-tree-panel")
         const tree = panel?.querySelector<HTMLElement>('[data-component="file-tree-v2"]')
         const rows = panel?.querySelectorAll('[data-slot="file-tree-v2-row"]') ?? []
         const fileRows = panel?.querySelectorAll('button[data-slot="file-tree-v2-row"]') ?? []

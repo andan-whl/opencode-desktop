@@ -1,22 +1,27 @@
 #!/usr/bin/env bun
 import { $ } from "bun"
+import { existsSync } from "node:fs"
+import { join } from "node:path"
 
-import { copyBuiltCliToResources, downloadCliToResources, resolveChannel } from "./utils"
+import { copyBuiltCliToResources, getCurrentCli, resolveChannel } from "./utils"
 
 const channel = resolveChannel()
-
-if (channel === "prod" && !Bun.env.OPENCODE_CLI_DIST) {
-  throw new Error("OPENCODE_CLI_DIST is required for production desktop builds")
-}
 
 await $`bun ./scripts/copy-icons.ts ${channel}`
 
 await $`bun ./scripts/copy-metainfo.ts ${channel}`
 
-if (channel === "dev") await downloadCliToResources()
+// This fork bundles its own CLI: the npm @opencode/* packages are upstream builds whose protocol
+// does not match this renderer (their /api/event stream fails as UnsupportedContentType), so
+// prebuild never downloads. OPENCODE_CLI_DIST overrides; otherwise the local packages/cli/dist
+// build is used and must exist.
+const cliDist = Bun.env.OPENCODE_CLI_DIST ?? join(import.meta.dirname, "../../cli/dist")
+const target = getCurrentCli().package.replace("@opencode/", "")
 
-if ((channel === "beta" || channel === "prod") && Bun.env.OPENCODE_CLI_DIST) {
-  await copyBuiltCliToResources(Bun.env.OPENCODE_CLI_DIST)
+if (!existsSync(join(cliDist, target))) {
+  throw new Error(
+    `No ${target} in ${cliDist}: build the CLI first with "bun run --cwd packages/cli build", or point OPENCODE_CLI_DIST at a distribution.`,
+  )
 }
 
-if (channel === "beta" && !Bun.env.OPENCODE_CLI_DIST) await downloadCliToResources("beta")
+await copyBuiltCliToResources(cliDist)

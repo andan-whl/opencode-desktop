@@ -1,18 +1,10 @@
 import { useI18n } from "@opencode/ui/context/i18n"
-import { SegmentedControlItem, SegmentedControl } from "@opencode/ui/segmented-control"
-import { TextInput } from "@opencode/ui/text-input"
-import { Keybind } from "@opencode/ui/keybind"
-import { Icon } from "@opencode/ui/icon"
-import { IconButton } from "@opencode/ui/icon-button"
-import { Tooltip } from "@opencode/ui/tooltip"
-import type { SessionReviewDiffStyle } from "../../components/session-review"
 import { ResizeHandle } from "@opencode/ui/resize-handle"
 import { ScrollView } from "@opencode/ui/scroll-view"
-import { useLocale } from "@kobalte/core/i18n"
+import { TextInput } from "@opencode/ui/text-input"
 import { makeEventListener } from "@solid-primitives/event-listener"
-import { Show, createEffect, createMemo, createSignal, type JSX } from "solid-js"
-import { getWorkerPool } from "../../pierre/worker"
-import { SessionFilePanelV2, SessionFilePanelV2Empty } from "./session-file-panel-v2"
+import { createEffect, createSignal, Show, type JSX } from "solid-js"
+import "./session-review-v2.css"
 
 export const SESSION_REVIEW_V2_SIDEBAR_WIDTH_DEFAULT = 240
 
@@ -22,28 +14,9 @@ export const SESSION_REVIEW_V2_SIDEBAR_WIDTH_MAX = 480
 
 export type SessionReviewExpandMode = "expand" | "collapse"
 
-export type SessionReviewV2Props = {
-  title?: JSX.Element
-  stats?: JSX.Element
-  empty?: JSX.Element
-  sidebarOpen?: boolean
-  sidebar?: JSX.Element
-  sidebarToggle?: JSX.Element
-  activeFile?: string
-  files: string[]
-  onSelectFile: (file: string) => void
-  diffStyle: SessionReviewDiffStyle
-  toolbarAction?: JSX.Element
-  onDiffStyleChange?: (style: SessionReviewDiffStyle) => void
-  expandMode: SessionReviewExpandMode
-  onExpandModeChange: (mode: SessionReviewExpandMode) => void
-  preview?: JSX.Element
-  hasDiffs: boolean
-}
-
 export type SessionReviewV2SidebarProps = {
   open: boolean
-  transition: boolean
+  transition?: boolean
   title?: JSX.Element
   stats?: JSX.Element
   filter: string
@@ -149,215 +122,5 @@ export function SessionReviewV2Sidebar(props: SessionReviewV2SidebarProps) {
         </div>
       </Show>
     </div>
-  )
-}
-
-export function SessionReviewV2(props: SessionReviewV2Props) {
-  const i18n = useI18n()
-  const locale = useLocale()
-
-  createEffect(() => {
-    getWorkerPool()
-  })
-
-  const fileIndex = () => {
-    const files = props.files
-
-    if (files.length === 0) return -1
-
-    const active = props.activeFile
-    const i = active ? files.indexOf(active) : -1
-
-    if (i >= 0) return i
-
-    return 0
-  }
-
-  const prev = () => {
-    if (!canCycle()) return
-
-    return props.files[(fileIndex() - 1 + props.files.length) % props.files.length]
-  }
-
-  const next = () => {
-    if (!canCycle()) return
-
-    return props.files[(fileIndex() + 1) % props.files.length]
-  }
-
-  const canCycle = () => props.files.length > 0
-  const previousKey = () => (locale.direction() === "rtl" ? "ArrowRight" : "ArrowLeft")
-  const nextKey = () => (locale.direction() === "rtl" ? "ArrowLeft" : "ArrowRight")
-  const showCollapsedMeta = () => props.sidebarOpen === false
-  // Memoize slot getters so Show conditions do not instantiate throwaway elements.
-  const title = createMemo(() => props.title)
-  const stats = createMemo(() => props.stats)
-
-  const cycle = (file: string | undefined) => {
-    if (!file) return
-    props.onSelectFile(file)
-  }
-
-  // Keep the advertised arrow keys working while the
-  // pane is mounted, but never while typing in an input or comment editor.
-  makeEventListener(document, "keydown", (event) => {
-    if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return
-
-    if (event.key !== previousKey() && event.key !== nextKey()) return
-    const target = event.target
-
-    if (target instanceof HTMLElement && (target.isContentEditable || target.closest("input, textarea, select"))) return
-
-    if (!props.hasDiffs || !canCycle()) return
-    const file = event.key === previousKey() ? prev() : next()
-
-    if (!file) return
-    event.preventDefault()
-    cycle(file)
-  })
-
-  const toolbarStart = () => (
-    <>
-      <Show when={showCollapsedMeta()}>
-        <div data-slot="session-review-v2-toolbar-collapsed-meta">
-          <Show when={title()}>
-            <div data-slot="session-review-v2-toolbar-title">{title()}</div>
-          </Show>
-          {stats()}
-          <Show when={canCycle()}>
-            <span data-slot="session-review-v2-file-position">
-              {fileIndex() + 1}/{props.files.length}
-            </span>
-          </Show>
-        </div>
-      </Show>
-      <div class="flex items-center">
-        <Tooltip
-          openDelay={2000}
-          inactive={!prev()}
-          value={
-            <>
-              {i18n.t("ui.sessionReviewV2.previousFile")}
-              <Keybind keys={[locale.direction() === "rtl" ? "→" : "←"]} variant="neutral" />
-            </>
-          }
-        >
-          <IconButton
-            icon={<Icon name="arrow-left" />}
-            variant="ghost"
-            size="small"
-            class="session-review-v2-file-nav-button"
-            disabled={!prev()}
-            onClick={() => cycle(prev())}
-            aria-label={i18n.t("ui.sessionReviewV2.previousFile")}
-          />
-        </Tooltip>
-        <Tooltip
-          openDelay={2000}
-          inactive={!next()}
-          value={
-            <>
-              {i18n.t("ui.sessionReviewV2.nextFile")}
-              <Keybind keys={[locale.direction() === "rtl" ? "←" : "→"]} variant="neutral" />
-            </>
-          }
-        >
-          <IconButton
-            icon={<Icon name="arrow-right" />}
-            variant="ghost"
-            size="small"
-            class="session-review-v2-file-nav-button"
-            disabled={!next()}
-            onClick={() => cycle(next())}
-            aria-label={i18n.t("ui.sessionReviewV2.nextFile")}
-          />
-        </Tooltip>
-      </div>
-    </>
-  )
-
-  const toolbarEnd = () => (
-    <>
-      {props.toolbarAction}
-      <SegmentedControl
-        value={props.expandMode}
-        onChange={(value) => {
-          if (value !== "expand" && value !== "collapse") return
-          props.onExpandModeChange(value)
-        }}
-        class="session-review-v2-segmented-control session-review-v2-segmented-control--icon"
-        aria-label={i18n.t("ui.sessionReviewV2.expandMode")}
-      >
-        <Tooltip openDelay={2000} value={i18n.t("ui.sessionReviewV2.showAllLines")}>
-          <SegmentedControlItem value="expand" aria-label={i18n.t("ui.sessionReviewV2.showAllLines")}>
-            <Icon name="expand" />
-          </SegmentedControlItem>
-        </Tooltip>
-        <Tooltip openDelay={2000} value={i18n.t("ui.sessionReviewV2.hideNonDiffLines")}>
-          <SegmentedControlItem value="collapse" aria-label={i18n.t("ui.sessionReviewV2.hideNonDiffLines")}>
-            <Icon name="collapse" />
-          </SegmentedControlItem>
-        </Tooltip>
-      </SegmentedControl>
-      <Show when={props.onDiffStyleChange}>
-        <SegmentedControl
-          value={props.diffStyle}
-          onChange={(value) => {
-            if (value !== "unified" && value !== "split") return
-            props.onDiffStyleChange?.(value)
-          }}
-          class="session-review-v2-segmented-control session-review-v2-segmented-control--icon"
-          aria-label={i18n.t("ui.sessionReviewV2.diffView")}
-        >
-          <Tooltip openDelay={2000} value={i18n.t("ui.sessionReviewV2.unifiedDiff")}>
-            <SegmentedControlItem value="unified" aria-label={i18n.t("ui.sessionReviewV2.unifiedDiff")}>
-              <Icon name="unified" />
-            </SegmentedControlItem>
-          </Tooltip>
-          <Tooltip openDelay={2000} value={i18n.t("ui.sessionReviewV2.splitDiff")}>
-            <SegmentedControlItem value="split" aria-label={i18n.t("ui.sessionReviewV2.splitDiff")}>
-              <Icon name="split" />
-            </SegmentedControlItem>
-          </Tooltip>
-        </SegmentedControl>
-      </Show>
-    </>
-  )
-
-  return (
-    <SessionFilePanelV2
-      sidebar={props.sidebar}
-      sidebarToggle={props.sidebarToggle}
-      sidebarCollapsed={props.sidebarOpen === false}
-      toolbar={props.hasDiffs || props.sidebarOpen === false}
-      toolbarStart={toolbarStart()}
-      toolbarEnd={toolbarEnd()}
-    >
-      <Show when={props.hasDiffs} fallback={props.empty}>
-        <Show when={props.activeFile} fallback={<SessionFilePanelV2Empty>{props.empty}</SessionFilePanelV2Empty>}>
-          {props.preview}
-        </Show>
-      </Show>
-    </SessionFilePanelV2>
-  )
-}
-
-export function SessionReviewV2SidebarToggle(props: { opened: boolean; disabled?: boolean; onToggle: () => void }) {
-  const i18n = useI18n()
-
-  return (
-    <Tooltip value={i18n.t("ui.sessionReviewV2.toggleSidebar")}>
-      <IconButton
-        variant="ghost"
-        size="small"
-        class="session-review-v2-sidebar-toggle"
-        aria-label={i18n.t("ui.sessionReviewV2.toggleSidebar")}
-        aria-expanded={props.opened}
-        data-expanded={props.opened ? "" : undefined}
-        disabled={props.disabled}
-        onClick={props.onToggle}
-        icon={<Icon name="filetree" />}
-      />
-    </Tooltip>
   )
 }

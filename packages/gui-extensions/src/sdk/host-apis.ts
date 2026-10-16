@@ -162,6 +162,27 @@ export interface FileNode {
 export interface Files {
   /** The workspace root directory. */
   readonly root: string
+  /**
+   * Which sidebar view the session screen's activity bar shows. The sidebar renders the view it names.
+   * Reactive; `scm` still resolves to the plain tree when the review extension is absent.
+   */
+  readonly view: {
+    /** The selected view. Reactive. */
+    get(): "explorer" | "scm" | "search"
+    /**
+     * Selects the view the sidebar shows.
+     *
+     * @param view - The view to select.
+     */
+    set(view: "explorer" | "scm" | "search"): void
+    /**
+     * Selects the view and opens the sidebar panel beside the activity bar. Does nothing on narrow screens,
+     * where the sidebar panel does not exist.
+     *
+     * @param view - The view to select and show.
+     */
+    open(view: "explorer" | "scm" | "search"): void
+  }
   /** The per-file view state (selection, scroll) has loaded. Reactive. */
   ready(): boolean
   /**

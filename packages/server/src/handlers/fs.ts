@@ -1,6 +1,8 @@
 import { FileSystem } from "@opencode/core/filesystem"
+import { Location } from "@opencode/core/location"
+import { Ripgrep } from "@opencode/core/ripgrep"
 import { RelativePath } from "@opencode/core/schema"
-import { FileNotFoundError } from "@opencode/protocol/errors"
+import { FileNotFoundError, InvalidRequestError } from "@opencode/protocol/errors"
 import { Effect, Option, Stream } from "effect"
 import { type HttpServerRequest, HttpServerResponse } from "effect/http"
 import { HttpApiBuilder } from "effect/http-api"
@@ -43,6 +45,36 @@ export const FileSystemHandler = HttpApiBuilder.group(Api, "server.fs", (handler
           Effect.gen(function* () {
             const fs = yield* FileSystem.Service
             return yield* fs.find(ctx.query)
+          }),
+        ),
+      )
+      .handle("fs.grep", (ctx) =>
+        response(
+          Effect.gen(function* () {
+            const location = yield* Location.Service
+            const ripgrep = yield* Ripgrep.Service
+            return yield* ripgrep
+              .grep({
+                cwd: location.directory,
+                pattern: ctx.query.pattern,
+                include: ctx.query.include,
+                literal: ctx.query.literal,
+                caseSensitive: ctx.query.caseSensitive,
+                limit: ctx.query.limit ?? 200,
+              })
+              .pipe(
+                // A bad pattern is the client's mistake; a failed process is a server defect.
+                Effect.catchTag("Ripgrep.InvalidPatternError", (error) =>
+                  Effect.fail(
+                    new InvalidRequestError({
+                      message: error.message,
+                      kind: "invalid-pattern",
+                      field: "pattern",
+                    }),
+                  ),
+                ),
+                Effect.orDie,
+              )
           }),
         ),
       )

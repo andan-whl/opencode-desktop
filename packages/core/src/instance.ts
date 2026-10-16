@@ -32,6 +32,7 @@ import { Pty } from "./pty.js"
 import { Shell } from "./shell.js"
 import { ShellSelect } from "./shell/select.js"
 import { Reference } from "./reference.js"
+import { Ripgrep } from "./ripgrep.js"
 import { Rpc } from "./rpc.js"
 import { WebSearch } from "./websearch.js"
 import { ReferenceInstructions } from "./reference/instructions.js"
@@ -79,6 +80,8 @@ const nodes = [
   WorktreeStrategies.node,
   FileSystemSearch.node,
   FileSystem.node,
+  // Exposed so HTTP handlers can run content search directly; search keeps it as an internal dependency.
+  Ripgrep.node,
   ShellSelect.node,
   Pty.node,
   Shell.node,

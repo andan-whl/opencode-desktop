@@ -246,6 +246,8 @@ export type PermissionSource = { type: "tool"; messageID: string; id: string }
 
 export type PermissionSavedID = string
 
+export type FileSystemSubmatch = { text: string; start: number; end: number }
+
 export type CommandInfo = { name: string; description?: string }
 
 export type SkillInstallSource = { type: "path" | "url" | "git" | "index"; ref: string }
@@ -922,6 +924,14 @@ export type ModelVariant = {
 }
 
 export type PermissionRuleset = Array<PermissionRule>
+
+export type FileSystemMatch = {
+  entry: FileSystemEntry
+  line: number
+  offset: number
+  text: string
+  submatches: Array<FileSystemSubmatch>
+}
 
 export type SessionMessageUser = {
   id: SessionMessageID
@@ -6364,6 +6374,59 @@ export type FileFindInput = {
 }
 
 export type FileFindOutput = { location: LocationPublicRef; data: Array<FileSystemEntry> }
+
+export type FileGrepInput = {
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined } | undefined
+    readonly pattern: string
+    readonly include?: string | undefined
+    readonly literal?: boolean | undefined
+    readonly caseSensitive?: boolean | undefined
+    readonly limit?: number | undefined
+  }["location"]
+  readonly pattern: {
+    readonly location?: { readonly directory?: string | undefined } | undefined
+    readonly pattern: string
+    readonly include?: string | undefined
+    readonly literal?: boolean | undefined
+    readonly caseSensitive?: boolean | undefined
+    readonly limit?: number | undefined
+  }["pattern"]
+  readonly include?: {
+    readonly location?: { readonly directory?: string | undefined } | undefined
+    readonly pattern: string
+    readonly include?: string | undefined
+    readonly literal?: boolean | undefined
+    readonly caseSensitive?: boolean | undefined
+    readonly limit?: number | undefined
+  }["include"]
+  readonly literal?: {
+    readonly location?: { readonly directory?: string | undefined } | undefined
+    readonly pattern: string
+    readonly include?: string | undefined
+    readonly literal?: boolean | undefined
+    readonly caseSensitive?: boolean | undefined
+    readonly limit?: number | undefined
+  }["literal"]
+  readonly caseSensitive?: {
+    readonly location?: { readonly directory?: string | undefined } | undefined
+    readonly pattern: string
+    readonly include?: string | undefined
+    readonly literal?: boolean | undefined
+    readonly caseSensitive?: boolean | undefined
+    readonly limit?: number | undefined
+  }["caseSensitive"]
+  readonly limit?: {
+    readonly location?: { readonly directory?: string | undefined } | undefined
+    readonly pattern: string
+    readonly include?: string | undefined
+    readonly literal?: boolean | undefined
+    readonly caseSensitive?: boolean | undefined
+    readonly limit?: number | undefined
+  }["limit"]
+}
+
+export type FileGrepOutput = { location: LocationPublicRef; data: Array<FileSystemMatch> }
 
 export type FileWriteInput = {
   readonly location?: {

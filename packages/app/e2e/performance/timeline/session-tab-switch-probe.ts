@@ -26,14 +26,12 @@ async function installSessionSwitchProbe(
       let started: number | undefined
       let running = true
 
+      // The review lives in the sidebar's source-control view on wide screens; its levels only exist while it shows.
       const reviewLevels: Record<string, string> = {
-        panel: "#review-panel",
-        tabs: '#review-panel [data-component="tabs"]',
-        body: '#review-panel [data-slot="session-review-v2-body"]',
-        review: '#review-panel [data-component="session-review-v2"]',
-        preview: '#review-panel [data-slot="session-review-v2-preview"]',
-        scroll: '#review-panel [data-slot="session-review-v2-diff-scroll"]',
-        file: '#review-panel [data-component="file"][data-mode="diff"]',
+        panel: "#file-tree-panel",
+        scm: '#file-tree-panel [data-scope="review-scm"]',
+        scroll: '#file-tree-panel [data-slot="session-review-v2-diff-scroll"]',
+        file: '#file-tree-panel [data-component="file"][data-mode="diff"]',
       }
 
       const initialReviewNodes: Record<string, Element | null> = {}
@@ -42,7 +40,7 @@ async function installSessionSwitchProbe(
         if (!running || started === undefined) return
         setTimeout(() => {
           if (!running || started === undefined) return
-          const reviewPanel = document.querySelector<HTMLElement>("#review-panel")
+          const reviewPanel = document.querySelector<HTMLElement>('#file-tree-panel [data-scope="review-scm"]')
           const reviewFile = reviewPanel?.querySelector('[data-component="file"][data-mode="diff"]')
           const initialReviewFile = initialReviewNodes.file
 

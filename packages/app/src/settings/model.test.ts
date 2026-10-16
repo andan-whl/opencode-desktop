@@ -6,6 +6,7 @@ import {
   settingsSchema,
   settingsPersistence,
   defaultSettings,
+  migrateSettingsV3,
   monoDefault,
   monoFontFamily,
   sansDefault,
@@ -90,7 +91,7 @@ describe("settings schema", () => {
   test("supplies the existing defaults for an empty document", () => {
     expect(decode({})).toEqual({
       general: {
-        showFileTree: false,
+        showFileTree: true,
         timelineDetail: timelinePresets[2].value,
         showCustomAgents: false,
         mobileTitlebarPosition: "top",
@@ -181,6 +182,22 @@ describe("settings schema", () => {
     expect(() =>
       Schema.encodeUnknownSync(settingsSchema)({ ...decode({}), appearance: { fontSize: "large" } }),
     ).toThrow()
+  })
+})
+
+describe("settings v3 to v4 migration", () => {
+  test("restores the sidebar for the stored v3 default and keeps the rest of the document", () => {
+    const migrated = migrateSettingsV3({ general: { showFileTree: false, showSearch: true }, appearance: { fontSize: 16 } })
+
+    expect(migrated).toEqual({ general: { showFileTree: true, showSearch: true }, appearance: { fontSize: 16 } })
+    expect(decode(migrated).general.showFileTree).toBe(true)
+    expect(decode(migrated).appearance.fontSize).toBe(16)
+  })
+
+  test("passes documents without a general section through and rejects non-objects", () => {
+    expect(migrateSettingsV3({ appearance: { fontSize: 16 } })).toEqual({ appearance: { fontSize: 16 } })
+    expect(migrateSettingsV3("invalid")).toBeUndefined()
+    expect(migrateSettingsV3(null)).toBeUndefined()
   })
 })
 

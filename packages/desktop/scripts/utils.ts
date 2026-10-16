@@ -16,7 +16,8 @@ export function resolveChannel(): Channel {
 
   if (raw === "latest") return "prod"
 
-  return "dev"
+  // This fork ships one channel to itself; unset builds are releases, not upstream dev builds.
+  return "prod"
 }
 
 export const CLI_BINARIES: Array<{ target: string; package: string; os: string; cpu: string }> = [

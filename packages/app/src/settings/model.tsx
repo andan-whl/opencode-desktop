@@ -271,7 +271,7 @@ export const settingsPersistence = Persistence.migrate(
 
 export const defaultSettings: Settings = {
   general: {
-    showFileTree: false,
+    showFileTree: true,
     timelineDetail: { ...timelinePresets[2].value },
     showCustomAgents: false,
     mobileTitlebarPosition: "top",
@@ -296,11 +296,30 @@ function withFallback<T>(read: () => T | undefined, fallback: T) {
   return createMemo(() => read() ?? fallback)
 }
 
+/** Turns a stored v3 document into its v4 form: showFileTree false could only be the v3 default, so it becomes true. */
+export function migrateSettingsV3(value: unknown) {
+  if (typeof value !== "object" || value === null) return undefined
+  const general = (value as { general?: unknown }).general
+
+  if (typeof general !== "object" || general === null) return value
+
+  return { ...value, general: { ...general, showFileTree: true } }
+}
+
 export const { use: useSettings, provider: SettingsProvider } = createSimpleContext({
   name: "Settings",
   gate: false,
   init: () => {
-    const [store, setStore, , ready] = persisted({ key: "settings.v3" }, settingsPersistence, defaultSettings)
+    // v4: v3's showFileTree defaulted to false with no UI to turn it back on, so a stored false is the old
+    // default's residue rather than a choice; the activity bar era defaults the sidebar to visible.
+    const [store, setStore, , ready] = persisted(
+      {
+        key: "settings.v4",
+        copyFrom: [{ key: "settings.v3", pick: migrateSettingsV3 }],
+      },
+      settingsPersistence,
+      defaultSettings,
+    )
     const showFileTree = withFallback(() => store.general?.showFileTree, defaultSettings.general.showFileTree)
 
     const showCustomAgents = withFallback(

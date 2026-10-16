@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { readFileSync } from "node:fs"
 import { readdir, stat } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -16,6 +17,13 @@ const packageDir = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(packageDir, "../..")
 
 const signScript = path.join(rootDir, "script", "sign-windows.ps1")
+
+/** This fork's client version: what the installer and app metadata report, independent of upstream. */
+const desktopVersion = (JSON.parse(readFileSync(path.join(packageDir, "package.json"), "utf8")) as {
+  desktopVersion?: string
+}).desktopVersion
+
+if (!desktopVersion) throw new Error("packages/desktop/package.json must define desktopVersion")
 
 const metainfoFpm = (appId: string) =>
   `${path.join(packageDir, "resources", `${appId}.metainfo.xml`)}=/usr/share/metainfo/${appId}.metainfo.xml`
@@ -53,7 +61,8 @@ function resolveChannel() {
 
   if (raw === "latest") return "prod"
 
-  return "dev"
+  // This fork ships one channel to itself; unset builds are releases, not upstream dev builds.
+  return "prod"
 }
 
 const APP_IDS = {
@@ -76,8 +85,11 @@ const getBase = (appId: string): Configuration => {
     // "com.opencodedesktop.app.desktop".
     // https://developer.gnome.org/documentation/guidelines/maintainer/integrating.html
     // https://www.electron.build/docs/linux/
+    // The installer's version is this fork's client version (`desktopVersion`), independent of
+    // the upstream opencode package version that `version` tracks.
     extraMetadata: {
       desktopName: `${appId}.desktop`,
+      version: desktopVersion,
     },
     // Reuse the win32-x64 electron dist that `node_modules/electron` already fetched during
     // install, instead of downloading the zip through @electron/get whose cache lives in
@@ -195,7 +207,8 @@ const getBase = (appId: string): Configuration => {
     },
     nsis: {
       include: path.join(packageDir, "resources", "windows", "installer.nsh"),
-      oneClick: true,
+      oneClick: false,
+      allowToChangeInstallationDirectory: true,
       perMachine: false,
       installerIcon: `resources/icons/icon.ico`,
       installerHeaderIcon: `resources/icons/icon.ico`,

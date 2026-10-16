@@ -208,13 +208,12 @@ export function createReviewModel(input: {
     { equals: (previous, next) => previous.directory === next.directory && previous.data === next.data },
   )
 
-  // Opening the side region refreshes changes a tree already shows. Otherwise it loads them once, so the
-  // pinned tab reads "Files Changed N": v2 opened the region on the review tab before selecting another.
-  // A region restored open does not load them until something shows them.
+  // Opening the sidebar's tree refreshes changes the tree already shows. Otherwise it loads them once, so the
+  // count shows before anything renders them. A sidebar restored open does not load them until something shows them.
   const opened = createMemo(
     on(
-      () => !layout.narrow() && layout.side.opened(view()),
-      (open, previous) => (open && !previous ? {} : undefined),
+      () => input.demand.tree,
+      (now, previous) => (now > 0 && previous === 0 ? {} : undefined),
       { defer: true },
     ),
   )
@@ -456,8 +455,11 @@ export function createReviewModel(input: {
     saveLabel: ctx.t("common.save"),
   }))
 
+  // Shows the review: the sidebar's source-control view on wide screens, the Changes view on narrow ones.
   const open = () => {
-    if (!layout.side.opened(view())) layout.side.toggle(view())
+    if (layout.narrow()) return layout.open("review:changes", view())
+
+    screen.file.view.open("scm")
   }
 
   const openPath = (path: string) =>

@@ -24,7 +24,7 @@ import { containsDirectory } from "@opencode/util/path"
 import { isWorkspaceDirectory } from "@/workspaces/paths"
 import { parseCommentNote, readPromptPresentation } from "@/composer/comment-note"
 import { useCommand } from "@/shell/commands/command"
-import { SessionAncestorTrail, SessionProjectMenu, SessionTitleHeader } from "../session-identity-header"
+import { SessionAncestorTrail, SessionTitleHeader } from "../session-identity-header"
 import { SessionHeaderSpacer } from "@/session/header/session-header"
 import { SessionRunningMenu } from "@/session/header/session-running-menu"
 
@@ -145,14 +145,6 @@ function MessageTimelineView(
   })
 
   const workspaceSession = createMemo(() => isWorkspaceDirectory(project(), sessionDirectory()))
-
-  const headerProject = createMemo(() => {
-    const session = props.session.data.info()
-
-    if (!session) return
-
-    return server.ctx.projects.forSession(session)
-  })
 
   createEffect(() => {
     const directory = project()?.worktree
@@ -463,11 +455,6 @@ function MessageTimelineView(
             <div class="h-12 w-full flex items-center justify-between gap-2">
               <div class="flex items-center gap-1 min-w-0 flex-1">
                 <div class="flex items-center gap-0.5 min-w-0 flex-1 w-full">
-                  <SessionProjectMenu
-                    project={headerProject()}
-                    directory={sessionDirectory()}
-                    workspace={workspaceSession()}
-                  />
                   <Show when={parentID()}>
                     {(id) => (
                       <SessionAncestorTrail

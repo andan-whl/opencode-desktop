@@ -186,7 +186,7 @@ async function measureReviewPaneLoad(page: Page, file: string) {
   await installReviewPaneProbe(page, { file })
   await startReviewPaneProbe(page)
   await page.getByRole("button", { name: "Toggle review" }).click()
-  await expect(page.locator("#review-panel")).toBeVisible()
+  await expect(page.locator("#file-tree-panel")).toBeVisible()
 
   return collectReviewPaneProbe(page)
 }
@@ -194,7 +194,8 @@ async function measureReviewPaneLoad(page: Page, file: string) {
 async function measureReviewNextFile(page: Page, file: string) {
   await installReviewPaneProbe(page, { file })
   await startReviewPaneProbe(page)
-  await page.getByRole("button", { name: "Next file" }).click()
+  const basename = file.split(/[\\/]/).at(-1) ?? file
+  await page.locator("#file-tree-panel").getByRole("button", { name: basename }).click()
 
   return collectReviewPaneProbe(page)
 }
@@ -207,8 +208,9 @@ async function installReviewPaneProbe(page: Page, input: { file: string }) {
     let running = true
 
     const paneState = () => {
-      const panel = document.querySelector<HTMLElement>("#review-panel")
-      const review = panel?.querySelector<HTMLElement>('[data-component="session-review-v2"]')
+      // The review lives in the sidebar's source-control view on wide screens.
+      const panel = document.querySelector<HTMLElement>("#file-tree-panel")
+      const review = panel?.querySelector<HTMLElement>('[data-scope="review-scm"]')
       const rect = (review ?? panel)?.getBoundingClientRect()
       const text = panel?.textContent ?? ""
 

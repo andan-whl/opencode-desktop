@@ -10,7 +10,8 @@ function resolveChannel() {
 
   if (raw === "latest") return "prod"
 
-  return "dev"
+  // This fork ships one channel to itself; unset builds are releases, not upstream dev builds.
+  return "prod"
 }
 
 const appPlugin = (await import("@opencode/app/vite")).default

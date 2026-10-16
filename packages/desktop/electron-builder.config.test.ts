@@ -51,11 +51,26 @@ test.each(channels)("channel identity for $channel", ({ channel, appId }) => {
   const config = load(channel)
   expect(config.appId).toBe(appId)
   expect(config.extraMetadata?.desktopName).toBe(`${appId}.desktop`)
+  // The client version is the fork's own, not the upstream opencode package version.
+  expect(config.extraMetadata?.version).toMatch(/^\d+\.\d+\.\d+$/)
+  expect(config.extraMetadata?.version).not.toBe("2.0.28")
   expect(config.linux?.executableName).toBe(appId)
   expect(config.linux?.desktop?.entry?.StartupWMClass).toBe(appId)
 
   for (const fpm of [config.deb?.fpm, config.rpm?.fpm]) {
     expect(fpm).toContainEqual(expect.stringContaining(`/usr/share/metainfo/${appId}.metainfo.xml`))
+  }
+})
+
+// An unset OPENCODE_CHANNEL is a release build of this fork, not an upstream dev build.
+test("channel identity for unset channel", () => {
+  const previous = process.env.OPENCODE_CHANNEL
+  delete process.env.OPENCODE_CHANNEL
+
+  try {
+    expect(getConfig().appId).toBe("com.opencodedesktop.app")
+  } finally {
+    if (previous !== undefined) process.env.OPENCODE_CHANNEL = previous
   }
 })
 
