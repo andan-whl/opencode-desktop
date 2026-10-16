@@ -27,8 +27,9 @@ bun run package:full                 # CLI build + prebuild + electron-builder (
 bun run package:full -- --mac        # same pipeline for another platform
 ```
 
-`package:full` rebuilds the CLI, refreshes `resources/` via prebuild, then packages, so the bundle never picks up a
-stale CLI from an earlier build. Set `OPENCODE_CHANNEL=dev` or `beta` to build a side-by-side identity instead.
+`package:full` rebuilds the CLI, builds the renderer/main bundles, refreshes `resources/` via prebuild, then
+packages, so the bundle never picks up a stale CLI or stale JS output from an earlier build. Set
+`OPENCODE_CHANNEL=dev` or `beta` to build a side-by-side identity instead.
 
 Set `OPENCODE_CLI_TARGET` when packaging for a different architecture. The CLI is placed outside `app.asar` in the
 application's resources directory, and packaging fails if it is missing.
