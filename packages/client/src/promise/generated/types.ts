@@ -18,7 +18,11 @@ export type ProjectID = string
 
 export type AgentID = string
 
+export type ModelID = string
+
 export type ProviderID = string
+
+export type ModelVariantID = string
 
 export type ProviderCompaction = { type: "summary" } | { type: "native" }
 
@@ -161,6 +165,8 @@ export type FormOption = { value: string; label: string; description?: string }
 export type FormExternalField = { key: string; type: "external"; url: string; title?: string; description?: string }
 
 export type FormValue = string | number | "Infinity" | "-Infinity" | "NaN" | boolean | Array<string>
+
+export type ModelFamily = string
 
 export type ModelReasoningField = "reasoning" | "reasoning_content" | "reasoning_text" | (string & {})
 
@@ -323,8 +329,6 @@ export type LocationPublicInfo = {
   project: { id: ProjectID; directory: AbsolutePath; canonical: AbsolutePath }
 }
 
-export type ModelRef = { id: string; providerID: ProviderID; variant?: string }
-
 export type SessionProviderContextProvenance = {
   providerID: ProviderID
   provider: string
@@ -333,6 +337,8 @@ export type SessionProviderContextProvenance = {
   protocol: string
   endpoint: string
 }
+
+export type ModelRef = { id: ModelID; providerID: ProviderID; variant?: ModelVariantID }
 
 export type ProviderSettings = {
   timeout?: number | false
@@ -897,6 +903,8 @@ export type ReferenceSource = ReferenceLocalSource | ReferenceGitSource
 
 export type WorktreeList = Array<WorktreeDirectory>
 
+export type SessionProviderContext = { version: 1; provenance: SessionProviderContextProvenance; messages: JsonValue }
+
 export type SessionStatsModelUsage = { model: ModelRef; steps: number; tokens: TokenUsageInfo; cost: MoneyUSD }
 
 export type SessionMessageModelSelected = {
@@ -908,8 +916,6 @@ export type SessionMessageModelSelected = {
   previous?: ModelRef
 }
 
-export type SessionProviderContext = { version: 1; provenance: SessionProviderContextProvenance; messages: JsonValue }
-
 export type ProviderRequest = {
   settings: ProviderSettings
   headers: { [x: string]: string }
@@ -917,7 +923,7 @@ export type ProviderRequest = {
 }
 
 export type ModelVariant = {
-  id: string
+  id: ModelVariantID
   settings?: ModelSettings
   headers?: { [x: string]: string }
   body?: { [x: string]: any }
@@ -2026,21 +2032,6 @@ export type ReferenceInfo = {
   source: ReferenceSource
 }
 
-export type SessionStatsInfo = {
-  range: { from: number; to: number }
-  sessions: number
-  subagents: number
-  prompts: number
-  steps: number
-  tokens: TokenUsageInfo
-  cost: MoneyUSD
-  tools: SessionStatsTools
-  activeDays: number
-  streak: number
-  activity: Array<SessionStatsActivity>
-  models: Array<SessionStatsModelUsage>
-}
-
 export type SessionMessageCompactionCompleted = {
   type: "compaction"
   id: SessionMessageID
@@ -2077,12 +2068,27 @@ export type SessionCompactionEnded = {
   }
 }
 
+export type SessionStatsInfo = {
+  range: { from: number; to: number }
+  sessions: number
+  subagents: number
+  prompts: number
+  steps: number
+  tokens: TokenUsageInfo
+  cost: MoneyUSD
+  tools: SessionStatsTools
+  activeDays: number
+  streak: number
+  activity: Array<SessionStatsActivity>
+  models: Array<SessionStatsModelUsage>
+}
+
 export type ModelInfo = {
-  id: string
-  modelID: string
+  id: ModelID
+  modelID: ModelID
   providerID: ProviderID
   canonical?: ProviderID
-  family?: string
+  family?: ModelFamily
   name: string
   compatibility?: ModelCompatibility
   package?: string
@@ -2288,8 +2294,8 @@ export type ConfigEntry =
             body?: { [x: string]: JsonValue }
             models?: {
               [x: string]: {
-                modelID?: string
-                family?: string
+                modelID?: ModelID
+                family?: ModelFamily
                 name?: string
                 compatibility?: ModelCompatibility
                 package?: string
@@ -2298,7 +2304,7 @@ export type ConfigEntry =
                 body?: { [x: string]: JsonValue }
                 capabilities?: ConfigModelCapabilities
                 variants?: Array<{
-                  id: string
+                  id: ModelVariantID
                   settings?: ConfigModelSettings
                   headers?: { [x: string]: string }
                   body?: { [x: string]: JsonValue }
@@ -6936,6 +6942,175 @@ export type ConfigGetOutput = Array<ConfigEntry>
 
 export type ConfigShellsOutput = Array<ConfigShellOption>
 
-export type ConfigUpdateInput = { readonly shell: { readonly shell: string | null }["shell"] }
+export type ConfigUpdateInput = {
+  readonly shell?: {
+    readonly shell?: string | null
+    readonly providers?: {
+      readonly [x: string]: {
+        readonly canonical?: string
+        readonly name?: string
+        readonly env?: ReadonlyArray<string>
+        readonly package?: string
+        readonly compatibility?: {
+          readonly reasoningField?: "reasoning" | "reasoning_content" | "reasoning_text" | (string & {})
+          readonly requireReasoning?: boolean
+          readonly maxTokensField?: "max_completion_tokens" | "max_tokens"
+          readonly requireFinishReason?: boolean
+          readonly requireAssistantAfterTool?: boolean
+          readonly supportsPromptCacheKey?: boolean
+          readonly cacheFormat?: "anthropic" | "alibaba"
+        }
+        readonly settings?: {
+          readonly timeout?: number | false
+          readonly headerTimeout?: number | false
+          readonly chunkTimeout?: number | false
+          readonly compaction?: { readonly type: "summary" } | { readonly type: "native" }
+          readonly transport?: "http" | "websocket"
+          readonly encoding?: "zstd" | "gzip" | "none"
+        } & { readonly [x: string]: JsonValue | null }
+        readonly headers?: { readonly [x: string]: string }
+        readonly body?: { readonly [x: string]: JsonValue }
+        readonly models?: {
+          readonly [x: string]: {
+            readonly modelID?: string
+            readonly family?: string
+            readonly name?: string
+            readonly compatibility?: {
+              readonly reasoningField?: "reasoning" | "reasoning_content" | "reasoning_text" | (string & {})
+              readonly requireReasoning?: boolean
+              readonly maxTokensField?: "max_completion_tokens" | "max_tokens"
+              readonly requireFinishReason?: boolean
+              readonly requireAssistantAfterTool?: boolean
+              readonly supportsPromptCacheKey?: boolean
+              readonly cacheFormat?: "anthropic" | "alibaba"
+              readonly supportsThinkingBlockBinding?: boolean
+              readonly supportsEffortUpdates?: boolean
+            }
+            readonly package?: string
+            readonly settings?: {
+              readonly compaction?: { readonly type: "summary" } | { readonly type: "native" }
+              readonly encoding?: "zstd" | "gzip" | "none"
+            } & { readonly [x: string]: JsonValue | null }
+            readonly headers?: { readonly [x: string]: string }
+            readonly body?: { readonly [x: string]: JsonValue }
+            readonly capabilities?: {
+              readonly tools?: boolean
+              readonly input?: ReadonlyArray<string>
+              readonly output?: ReadonlyArray<string>
+            }
+            readonly variants?: ReadonlyArray<{
+              readonly id: string
+              readonly settings?: {
+                readonly compaction?: { readonly type: "summary" } | { readonly type: "native" }
+                readonly encoding?: "zstd" | "gzip" | "none"
+              } & { readonly [x: string]: JsonValue | null }
+              readonly headers?: { readonly [x: string]: string }
+              readonly body?: { readonly [x: string]: JsonValue }
+            }>
+            readonly cost?:
+              | {
+                  readonly tier?: { readonly type: "context"; readonly size: number }
+                  readonly input: number
+                  readonly output: number
+                  readonly cache?: { readonly read?: number; readonly write?: number }
+                }
+              | ReadonlyArray<{
+                  readonly tier?: { readonly type: "context"; readonly size: number }
+                  readonly input: number
+                  readonly output: number
+                  readonly cache?: { readonly read?: number; readonly write?: number }
+                }>
+            readonly disabled?: boolean
+            readonly limit?: { readonly context?: number; readonly input?: number; readonly output?: number }
+          }
+        }
+      }
+    }
+  }["shell"]
+  readonly providers?: {
+    readonly shell?: string | null
+    readonly providers?: {
+      readonly [x: string]: {
+        readonly canonical?: string
+        readonly name?: string
+        readonly env?: ReadonlyArray<string>
+        readonly package?: string
+        readonly compatibility?: {
+          readonly reasoningField?: "reasoning" | "reasoning_content" | "reasoning_text" | (string & {})
+          readonly requireReasoning?: boolean
+          readonly maxTokensField?: "max_completion_tokens" | "max_tokens"
+          readonly requireFinishReason?: boolean
+          readonly requireAssistantAfterTool?: boolean
+          readonly supportsPromptCacheKey?: boolean
+          readonly cacheFormat?: "anthropic" | "alibaba"
+        }
+        readonly settings?: {
+          readonly timeout?: number | false
+          readonly headerTimeout?: number | false
+          readonly chunkTimeout?: number | false
+          readonly compaction?: { readonly type: "summary" } | { readonly type: "native" }
+          readonly transport?: "http" | "websocket"
+          readonly encoding?: "zstd" | "gzip" | "none"
+        } & { readonly [x: string]: JsonValue | null }
+        readonly headers?: { readonly [x: string]: string }
+        readonly body?: { readonly [x: string]: JsonValue }
+        readonly models?: {
+          readonly [x: string]: {
+            readonly modelID?: string
+            readonly family?: string
+            readonly name?: string
+            readonly compatibility?: {
+              readonly reasoningField?: "reasoning" | "reasoning_content" | "reasoning_text" | (string & {})
+              readonly requireReasoning?: boolean
+              readonly maxTokensField?: "max_completion_tokens" | "max_tokens"
+              readonly requireFinishReason?: boolean
+              readonly requireAssistantAfterTool?: boolean
+              readonly supportsPromptCacheKey?: boolean
+              readonly cacheFormat?: "anthropic" | "alibaba"
+              readonly supportsThinkingBlockBinding?: boolean
+              readonly supportsEffortUpdates?: boolean
+            }
+            readonly package?: string
+            readonly settings?: {
+              readonly compaction?: { readonly type: "summary" } | { readonly type: "native" }
+              readonly encoding?: "zstd" | "gzip" | "none"
+            } & { readonly [x: string]: JsonValue | null }
+            readonly headers?: { readonly [x: string]: string }
+            readonly body?: { readonly [x: string]: JsonValue }
+            readonly capabilities?: {
+              readonly tools?: boolean
+              readonly input?: ReadonlyArray<string>
+              readonly output?: ReadonlyArray<string>
+            }
+            readonly variants?: ReadonlyArray<{
+              readonly id: string
+              readonly settings?: {
+                readonly compaction?: { readonly type: "summary" } | { readonly type: "native" }
+                readonly encoding?: "zstd" | "gzip" | "none"
+              } & { readonly [x: string]: JsonValue | null }
+              readonly headers?: { readonly [x: string]: string }
+              readonly body?: { readonly [x: string]: JsonValue }
+            }>
+            readonly cost?:
+              | {
+                  readonly tier?: { readonly type: "context"; readonly size: number }
+                  readonly input: number
+                  readonly output: number
+                  readonly cache?: { readonly read?: number; readonly write?: number }
+                }
+              | ReadonlyArray<{
+                  readonly tier?: { readonly type: "context"; readonly size: number }
+                  readonly input: number
+                  readonly output: number
+                  readonly cache?: { readonly read?: number; readonly write?: number }
+                }>
+            readonly disabled?: boolean
+            readonly limit?: { readonly context?: number; readonly input?: number; readonly output?: number }
+          }
+        }
+      }
+    }
+  }["providers"]
+}
 
 export type ConfigUpdateOutput = void

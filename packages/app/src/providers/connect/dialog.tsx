@@ -109,7 +109,7 @@ export const DialogConnectProvider: Component<{
     return (
       <Switch>
         <Match when={controller.selected() === CUSTOM_ID}>
-          <CustomProviderForm autofocus={false} />
+          <CustomProviderForm autofocus={false} directory={props.directory} defaultLocation={props.defaultLocation} />
         </Match>
         <Match
           keyed

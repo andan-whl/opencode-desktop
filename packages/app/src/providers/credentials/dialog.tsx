@@ -7,16 +7,23 @@ import { TextField } from "@opencode/ui/text-field"
 import { showToast } from "@/shell/notifications/toast"
 import { batch, For } from "solid-js"
 import { createStore, produce } from "solid-js/store"
+import { useParams } from "@solidjs/router"
 import { ExternalLink } from "@/runtime/platform/external-link"
+import { decode64 } from "@/runtime/persistence/base64"
 import { useData } from "@/runtime/server/current"
+import { useServerSDK } from "@/runtime/server/client"
 import { useLanguage } from "@/runtime/i18n/language"
 import { type FormState, headerRow, modelRow, validateCustomProvider } from "./form"
 import { CustomManagedProviderIcon } from "@/providers/models/provider-group"
 
-export function CustomProviderForm(props: { autofocus?: boolean } = {}) {
+export function CustomProviderForm(props: { autofocus?: boolean; directory?: string; defaultLocation?: boolean } = {}) {
   const dialog = useDialog()
   const data = useData()
+  const serverSDK = useServerSDK()
   const language = useLanguage()
+  const params = useParams()
+  // A sign-in belongs to the Location where it began, even if the route changes underneath it.
+  const initialDirectory = props.defaultLocation ? undefined : (props.directory ?? decode64(params.dir))
 
   const [form, setForm] = createStore<FormState>({
     providerID: "",
@@ -105,10 +112,43 @@ export function CustomProviderForm(props: { autofocus?: boolean } = {}) {
     return output.result
   }
 
+  const locationRef = () => (initialDirectory ? { directory: initialDirectory } : undefined)
+
   const saveMutation = useMutation(() => ({
     mutationFn: async (result: NonNullable<ReturnType<typeof validate>>): Promise<typeof result> => {
-      // TODO: Restore custom providers when V2 exposes config and arbitrary credential APIs.
-      throw new Error(language.t("provider.custom.unavailable"))
+      await serverSDK.api.config.update({ providers: { [result.providerID]: result.provider } })
+
+      // The config file reload that registers the integration is asynchronous, so poll until
+      // the new integration exists before connecting the key.
+      if (result.key) {
+        const deadline = Date.now() + 10_000
+        for (;;) {
+          const ready = await serverSDK.api.integration
+            .get({ integrationID: result.providerID, location: locationRef() })
+            .then(() => true)
+            .catch(() => false)
+          if (ready) break
+          if (Date.now() >= deadline) throw new Error(language.t("provider.custom.error.registrationTimeout"))
+          await new Promise((resolve) => setTimeout(resolve, 250))
+        }
+        await serverSDK.api.integration.connect.key({
+          integrationID: result.providerID,
+          location: locationRef(),
+          key: result.key,
+        })
+      }
+
+      const ref = locationRef()
+      data.location.integration.invalidate(ref)
+      data.location.provider.invalidate(ref)
+      data.location.model.invalidate(ref)
+      await Promise.all([
+        data.location.integration.sync(ref),
+        data.location.provider.sync(ref),
+        data.location.model.sync(ref),
+      ]).catch(() => undefined)
+
+      return result
     },
     onSuccess: (result) => {
       dialog.close()

@@ -153,14 +153,13 @@ export function validateCustomProvider(input: ValidateArgs) {
       providerID,
       name,
       key,
-      config: {
-        npm: OPENAI_COMPATIBLE,
+      env,
+      provider: {
         name,
+        package: OPENAI_COMPATIBLE,
         ...(env ? { env: [env] } : {}),
-        options: {
-          baseURL,
-          ...(Object.keys(headerConfig).length ? { headers: headerConfig } : {}),
-        },
+        settings: { baseURL },
+        ...(Object.keys(headerConfig).length ? { headers: headerConfig } : {}),
         models: modelConfig,
       },
     },

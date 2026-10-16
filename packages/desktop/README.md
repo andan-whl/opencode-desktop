@@ -23,11 +23,12 @@ packages are upstream builds whose protocol does not match this fork's renderer.
 `OPENCODE_CLI_DIST` when it is set, otherwise from `packages/cli/dist`, and fails with guidance when neither exists:
 
 ```bash
-bun run --cwd packages/cli build   # once, and after CLI changes
-bun run build && bun run package   # prod channel by default
+bun run package:full                 # CLI build + prebuild + electron-builder (Windows by default)
+bun run package:full -- --mac        # same pipeline for another platform
 ```
 
-Set `OPENCODE_CHANNEL=dev` or `beta` to build a side-by-side identity instead.
+`package:full` rebuilds the CLI, refreshes `resources/` via prebuild, then packages, so the bundle never picks up a
+stale CLI from an earlier build. Set `OPENCODE_CHANNEL=dev` or `beta` to build a side-by-side identity instead.
 
 Set `OPENCODE_CLI_TARGET` when packaging for a different architecture. The CLI is placed outside `app.asar` in the
 application's resources directory, and packaging fails if it is missing.

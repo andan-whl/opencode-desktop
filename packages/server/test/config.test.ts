@@ -102,3 +102,70 @@ it.live("updates the global shell without replacing unrelated JSONC", () =>
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
+
+it.live("upserts custom providers into the global config without replacing unrelated JSONC", () =>
+  Effect.gen(function* () {
+    const tmp = yield* Effect.acquireDisposable(Effect.promise(() => tmpdir("opencode-config-providers-")))
+    const global = path.join(tmp.path, "global")
+    const config = path.join(global, "opencode.jsonc")
+    yield* Effect.promise(() => fs.mkdir(global, { recursive: true }))
+    yield* Effect.promise(() =>
+      fs.writeFile(
+        config,
+        `{
+  // keep this comment
+  "model": "provider/model",
+  "shell": "bash"
+}
+`,
+      ),
+    )
+    const server = yield* startServer(global)
+    const patch = {
+      providers: {
+        "volcano-ark": {
+          name: "Volcano Ark",
+          package: "@ai-sdk/openai-compatible",
+          settings: { baseURL: "https://ark.cn-beijing.volces.com/api/v3" },
+          models: { "doubao-seed-2-1-pro": { name: "Seed 2.1 Pro" } },
+        },
+      },
+    }
+    const response = yield* Effect.promise(() =>
+      fetch(new URL("/api/experimental/config", server.base), {
+        method: "PATCH",
+        headers: { ...server.headers, "content-type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+    )
+
+    expect(response.status).toBe(204)
+    const text = yield* Effect.promise(() => fs.readFile(config, "utf8"))
+    expect(text).toContain("// keep this comment")
+    expect(text).toContain('"model": "provider/model"')
+    expect(text).toContain('"shell": "bash"')
+    const parsed = JSON.parse(stripJsoncComments(text))
+    expect(parsed.providers["volcano-ark"]).toEqual(patch.providers["volcano-ark"])
+
+    // Upserting the same key again must not drop other provider entries.
+    const again = yield* Effect.promise(() =>
+      fetch(new URL("/api/experimental/config", server.base), {
+        method: "PATCH",
+        headers: { ...server.headers, "content-type": "application/json" },
+        body: JSON.stringify({
+          providers: {
+            "another-provider": { name: "Another", package: "@ai-sdk/openai-compatible" },
+          },
+        }),
+      }),
+    )
+    expect(again.status).toBe(204)
+    const reparsed = JSON.parse(stripJsoncComments(yield* Effect.promise(() => fs.readFile(config, "utf8"))))
+    expect(reparsed.providers["volcano-ark"]).toEqual(patch.providers["volcano-ark"])
+    expect(reparsed.providers["another-provider"]).toEqual({ name: "Another", package: "@ai-sdk/openai-compatible" })
+  }),
+)
+
+function stripJsoncComments(text: string): string {
+  return text.replace(/^\s*\/\/.*$/gm, "")
+}

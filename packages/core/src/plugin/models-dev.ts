@@ -5,6 +5,7 @@ import { Effect, Stream } from "effect"
 import { Bus } from "../bus.js"
 import { Model } from "../model.js"
 import { ModelsDev } from "../models-dev.js"
+import { forkProviders } from "../models-dev/fork.js"
 
 // These catalog entries require inference profiles on Bedrock Runtime.
 // Opus/Sonnet 4.6 support in-region calls in eu-west-2 and must remain available.
@@ -34,13 +35,16 @@ export const ModelsDevPlugin = define({
     const loaded = { data: snapshots(yield* modelsDev.get()) }
     yield* ctx.integration.transform((integrations) => {
       for (const provider of loaded.data) {
-        if (provider.environment.length === 0) continue
+        // Fork-local providers declare no environment variables but still expose a
+        // key-only integration, exactly like any other catalog provider.
+        if (provider.environment.length === 0 && !(provider.info.id in forkProviders)) continue
         const integrationID = provider.info.id
         integrations.update(integrationID, (integration) => (integration.name = provider.info.name))
         integrations.method.update({
           integrationID,
           method: { type: "key" },
         })
+        if (provider.environment.length === 0) continue
         integrations.method.update({
           integrationID,
           method: {

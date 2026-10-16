@@ -27,15 +27,16 @@ describe("validateCustomProvider", () => {
       providerID: "custom-provider",
       name: "Custom Provider",
       key: undefined,
-      config: {
-        npm: "@ai-sdk/openai-compatible",
+      env: "CUSTOM_PROVIDER_KEY",
+      provider: {
         name: "Custom Provider",
+        package: "@ai-sdk/openai-compatible",
         env: ["CUSTOM_PROVIDER_KEY"],
-        options: {
+        settings: {
           baseURL: "https://api.example.com",
-          headers: {
-            "X-Test": "enabled",
-          },
+        },
+        headers: {
+          "X-Test": "enabled",
         },
         models: {
           "model-a": { name: "Model A" },

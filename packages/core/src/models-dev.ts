@@ -14,6 +14,7 @@ import { Provider } from "./provider.js"
 import { Variant } from "./variant.js"
 import { KV } from "./kv.js"
 import snapshotText from "./models-dev/snapshot.txt" with { type: "text" }
+import { forkProviders } from "./models-dev/fork.js"
 
 export const CatalogModelStatus = Schema.Literals(["alpha", "beta", "deprecated"])
 export type CatalogModelStatus = typeof CatalogModelStatus.Type
@@ -67,7 +68,7 @@ type SourceModel = {
   }
 }
 
-type SourceProvider = {
+export type SourceProvider = {
   readonly api?: string
   readonly name: string
   readonly env: readonly string[]
@@ -285,12 +286,15 @@ const defaultSource = "https://models.opencode.ai"
 // host many runtimes (Cloudflare colocates Durable Object instances), so
 // per-runtime decoding would multiply the cost.
 let bundledCache: readonly Snapshot[] | undefined
+// Fork-local providers merge on top of every catalog source, so they always appear as
+// built-in providers regardless of which source (file, cache, snapshot, fetch) wins.
+const withForkProviders = (input: Record<string, SourceProvider>) => ({ ...input, ...forkProviders })
 const bundledSnapshot = Effect.suspend(() =>
   bundledCache
     ? Effect.succeed(bundledCache)
     : decodeCatalog(snapshotText).pipe(
         Effect.map((catalog) => {
-          bundledCache = normalize(catalog)
+          bundledCache = normalize(withForkProviders(catalog))
           return bundledCache
         }),
       ),
@@ -384,9 +388,9 @@ export const layer = (options?: Options) =>
 
       const populate = Effect.gen(function* () {
         const fromFile = yield* loadFromFile
-        if (fromFile) return normalize(fromFile)
+        if (fromFile) return normalize(withForkProviders(fromFile))
         const cached = options?.file ? undefined : yield* loadFromCache()
-        if (cached) return normalize(cached.catalog)
+        if (cached) return normalize(withForkProviders(cached.catalog))
         const bundled = yield* loadSnapshot
         if (bundled) return bundled
         if (!fetch) return []
@@ -397,7 +401,7 @@ export const layer = (options?: Options) =>
             return yield* fetchAndWrite()
           }),
         )
-        return normalize(catalog)
+        return normalize(withForkProviders(catalog))
       }).pipe(Effect.withSpan("ModelsDev.populate"), Effect.orDie)
 
       const [cachedGet, invalidate] = yield* Effect.cachedInvalidateWithTTL(populate, Duration.infinity)

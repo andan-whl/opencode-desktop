@@ -600,7 +600,9 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
       region(tab: Tab | undefined, region: TabRegion) {
         if (!tab) return false
 
-        return regions[tabKey(tab)]?.[region] ?? false
+        // The side region defaults to open so the middle column stays visible with its
+        // empty state instead of hiding while no file is open; explicit toggles persist.
+        return regions[tabKey(tab)]?.[region] ?? region === "side"
       },
       setRegion(tab: Tab | undefined, region: TabRegion, opened: boolean) {
         if (!tab) return
