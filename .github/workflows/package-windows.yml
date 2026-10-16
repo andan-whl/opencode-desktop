@@ -1,0 +1,42 @@
+name: package-windows
+
+# Builds the Windows installer with the same one-command pipeline used locally
+# (CLI build + prebuild + electron-builder). Tag pushes publish a GitHub Release;
+# manual dispatches only upload the installer as a workflow artifact.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build CLI and package installer
+        run: bun run --cwd packages/desktop package:full -- --win --publish never
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenCodeDesktop-win-x64
+          path: packages/desktop/dist/OpenCodeDesktop-win-x64.exe
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packages/desktop/dist/OpenCodeDesktop-win-x64.exe
