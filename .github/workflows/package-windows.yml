@@ -37,6 +37,13 @@ jobs:
           }
 
       - name: Build CLI and package installer
+        env:
+          # actions/checkout leaves a detached HEAD, so the CLI build would derive the channel
+          # "detached" and register its background service in service-detached.json while the
+          # desktop only polls service.json — the renderer then waits for a server forever.
+          # "next" keeps the release (prod) desktop identity and maps back to service.json
+          # and opencode.db, matching a local build made on the dev branch.
+          OPENCODE_CHANNEL: next
         run: bun run --cwd packages/desktop package:full -- --win --publish never
 
       - name: Upload installer artifact
