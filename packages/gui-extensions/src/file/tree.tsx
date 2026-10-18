@@ -392,21 +392,30 @@ export default function FileTree(props: {
                   open={expanded()}
                   onOpenChange={(open) => (open ? file.tree.expand(node.path) : file.tree.collapse(node.path))}
                 >
-                  <Collapsible.Trigger>
-                    <FileTreeNode
-                      node={node}
-                      level={level}
-                      active={props.active}
-                      nodeClass={props.nodeClass}
-                      draggable={draggable()}
-                      kinds={kinds()}
-                      marks={marks()}
-                    >
-                      <div class="size-4 flex items-center justify-center text-icon-weak">
-                        <Icon name={expanded() ? "chevron-down" : "chevron-right"} size="small" />
-                      </div>
-                    </FileTreeNode>
-                  </Collapsible.Trigger>
+                  <OpenInAppContextMenuV2
+                    state={props.openIn}
+                    // Directory paths keep a trailing separator, which explorer /select cannot parse.
+                    path={() => resolveOpenInAppPath(file.root, node.absolute || node.path).replace(/[\\/]+$/, "")}
+                  >
+                    <Collapsible.Trigger>
+                      <FileTreeNode
+                        node={node}
+                        level={level}
+                        active={props.active}
+                        selected={props.selected}
+                        nodeClass={props.nodeClass}
+                        draggable={draggable()}
+                        kinds={kinds()}
+                        marks={marks()}
+                        onClick={() => props.onSelect?.(node.path)}
+                        onContextMenu={() => props.onSelect?.(node.path)}
+                      >
+                        <div class="size-4 flex items-center justify-center text-icon-weak">
+                          <Icon name={expanded() ? "chevron-down" : "chevron-right"} size="small" />
+                        </div>
+                      </FileTreeNode>
+                    </Collapsible.Trigger>
+                  </OpenInAppContextMenuV2>
                   <Collapsible.Content class="relative pt-0.5">
                     <div
                       classList={{

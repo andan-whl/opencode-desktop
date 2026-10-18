@@ -539,7 +539,7 @@ const setup: Setup<typeof File> = (ctx) => {
     )),
   })
 
-  // Lists every expanded directory again from disk, for changes the tree's file events did not pick up.
+  // Lists every loaded directory again from disk, for changes the tree's file events did not pick up.
   ctx.add(Command, (): Command | undefined => {
     const screen = ctx.screen.current()
 
@@ -552,15 +552,20 @@ const setup: Setup<typeof File> = (ctx) => {
       run: () => {
         const file = screen.file
 
-        const reload = (dir: string) => {
-          void file.tree.sync(dir, { force: true })
+        // Collapsed listings go stale the same way expanded ones do, and a stale child that no
+        // longer exists on disk expands to an empty directory, so every loaded directory reloads.
+        // Each level awaits its listing so the walk follows fresh entries instead of removed ones.
+        const reload = (dir: string): Promise<void> =>
+          file.tree.sync(dir, { force: true }).then(() =>
+            Promise.all(
+              file.tree
+                .list(dir)
+                .filter((node) => node.type === "directory" && (file.tree.state(node.path)?.loaded ?? false))
+                .map((node) => reload(node.path)),
+            ).then(() => undefined),
+          )
 
-          for (const node of file.tree.list(dir)) {
-            if (node.type === "directory" && file.tree.state(node.path)?.expanded) reload(node.path)
-          }
-        }
-
-        reload("")
+        void reload("")
       },
     }
   })
