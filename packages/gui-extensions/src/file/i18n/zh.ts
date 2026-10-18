@@ -39,4 +39,6 @@ export default {
   "open.fileExplorer": "文件资源管理器",
   "open.fileManager": "文件管理器",
   "command.open": "打开文件",
+  "command.category.file": "文件",
+  "command.reloadFromDisk": "从磁盘重新加载全部文件",
 }

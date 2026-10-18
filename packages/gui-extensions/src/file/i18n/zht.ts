@@ -39,4 +39,6 @@ export default {
   "open.fileExplorer": "檔案總管",
   "open.fileManager": "檔案管理員",
   "command.open": "開啟檔案",
+  "command.category.file": "檔案",
+  "command.reloadFromDisk": "從磁碟重新載入全部檔案",
 }

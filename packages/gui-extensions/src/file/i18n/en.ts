@@ -63,4 +63,6 @@ export default {
   "open.fileExplorer": "File Explorer",
   "open.fileManager": "File Manager",
   "command.open": "Open file",
+  "command.category.file": "File",
+  "command.reloadFromDisk": "Reload all files from disk",
 }

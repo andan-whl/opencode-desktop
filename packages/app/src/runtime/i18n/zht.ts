@@ -16,6 +16,7 @@ export const dict = {
   "desktop.menu.exportLogs": "匯出記錄檔…",
   "desktop.menu.newSession": "新增工作階段",
   "desktop.menu.openProject": "開啟專案…",
+  "desktop.menu.reloadFromDisk": "從磁碟全部載入",
   "desktop.menu.newWindow": "新增視窗",
   "desktop.menu.closeWindow": "關閉視窗",
   "desktop.menu.undo": "復原",

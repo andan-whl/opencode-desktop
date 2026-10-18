@@ -274,8 +274,27 @@ const layer = () =>
         yield* hooks.trigger("shell", "create.before", invocation)
         if (before) yield* before(invocation)
 
+        // The capture file decodes as UTF-8, but Windows shells encode redirected output with the
+        // legacy OEM code page (GBK on Chinese locales). Keep Python on UTF-8 regardless of the
+        // host locale; respect any encoding the caller already set.
+        if (process.platform === "win32") {
+          invocation.env.PYTHONUTF8 ||= "1"
+          invocation.env.PYTHONIOENCODING ||= "utf-8"
+        }
+
         const id = Shell.ID.ascending()
-        const args = ShellSelect.args(invocation.shell, invocation.command)
+        // PowerShell and cmd themselves also encode redirected output with the OEM code page, so
+        // switch the shell to UTF-8 before the user's command runs. `info.command` keeps the
+        // original text for display and job titles.
+        const exec =
+          process.platform !== "win32"
+            ? invocation.command
+            : ShellSelect.ps(invocation.shell)
+              ? `[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); ${invocation.command}`
+              : ShellSelect.name(invocation.shell) === "cmd"
+                ? `chcp 65001>nul & ${invocation.command}`
+                : invocation.command
+        const args = ShellSelect.args(invocation.shell, exec)
         const file = path.join(outputDir, `${id}.out`)
 
         const info: Info = {

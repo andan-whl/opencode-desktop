@@ -16,6 +16,7 @@ export const dict = {
   "desktop.menu.exportLogs": "导出日志…",
   "desktop.menu.newSession": "新建会话",
   "desktop.menu.openProject": "打开项目…",
+  "desktop.menu.reloadFromDisk": "从磁盘全部加载",
   "desktop.menu.newWindow": "新建窗口",
   "desktop.menu.closeWindow": "关闭窗口",
   "desktop.menu.undo": "撤销",

@@ -6,6 +6,8 @@ import { Icon } from "@opencode/ui/icon"
 import type { ChangeKind } from "../review/contract"
 import { createKeyed, type FileNode, type MountedSession, type SessionScreen } from "../sdk"
 import { startFileDrag } from "./drag"
+import { OpenInAppContextMenuV2, useOpenInApp } from "./open-in-app"
+import { resolveOpenInAppPath } from "./path"
 
 const MAX_DEPTH = 128
 
@@ -73,6 +75,7 @@ const FileTreeNode = (
       node: FileNode
       level: number
       active?: string
+      selected?: string
       nodeClass?: string
       draggable: boolean
       kinds?: ReadonlyMap<string, ChangeKind>
@@ -84,6 +87,7 @@ const FileTreeNode = (
     "node",
     "level",
     "active",
+    "selected",
     "nodeClass",
     "draggable",
     "kinds",
@@ -112,6 +116,7 @@ const FileTreeNode = (
       classList={{
         "w-full min-w-0 h-6 flex items-center justify-start gap-x-1.5 rounded-md px-1.5 py-0 text-start hover:bg-surface-raised-base-hover active:bg-surface-base-active transition-colors cursor-pointer": true,
         "bg-surface-base-active": local.node.path === local.active,
+        "bg-surface-raised-base-active": local.node.path === local.selected && local.node.path !== local.active,
         ...local.classList,
         [local.class ?? ""]: !!local.class,
         [local.nodeClass ?? ""]: !!local.nodeClass,
@@ -161,6 +166,9 @@ export default function FileTree(props: {
   class?: string
   nodeClass?: string
   active?: string
+  selected?: string
+  onSelect?: (path: string) => void
+  openIn?: ReturnType<typeof useOpenInApp>
   level?: number
   allowed?: readonly string[]
   modified?: readonly string[]
@@ -421,6 +429,9 @@ export default function FileTree(props: {
                         modified={props.modified}
                         kinds={props.kinds}
                         active={props.active}
+                        selected={props.selected}
+                        onSelect={props.onSelect}
+                        openIn={props.openIn}
                         draggable={props.draggable}
                         onFileClick={props.onFileClick}
                         onFileDoubleClick={props.onFileDoubleClick}
@@ -435,52 +446,59 @@ export default function FileTree(props: {
                 </Collapsible>
               </Match>
               <Match when={node.type === "file"}>
-                <FileTreeNode
-                  node={node}
-                  level={level}
-                  active={props.active}
-                  nodeClass={props.nodeClass}
-                  draggable={draggable()}
-                  kinds={kinds()}
-                  marks={marks()}
-                  as="button"
-                  type="button"
-                  onClick={() => props.onFileClick?.(node)}
-                  onDblClick={() => props.onFileDoubleClick?.(node)}
+                <OpenInAppContextMenuV2
+                  state={props.openIn}
+                  path={() => resolveOpenInAppPath(file.root, node.absolute || node.path)}
                 >
-                  <div class="w-4 shrink-0" />
-                  <Switch>
-                    <Match when={node.ignored}>
-                      <FileIcon
-                        node={node}
-                        class="size-4 filetree-icon filetree-icon--mono"
-                        style="color: var(--icon-weak-base)"
-                        mono
-                      />
-                    </Match>
-                    <Match when={active()}>
-                      <FileIcon
-                        node={node}
-                        class="size-4 filetree-icon filetree-icon--mono"
-                        style={kindTextColor(kind()!)}
-                        mono
-                      />
-                    </Match>
-                    <Match when={!node.ignored}>
-                      <span class="filetree-iconpair size-4">
+                  <FileTreeNode
+                    node={node}
+                    level={level}
+                    active={props.active}
+                    selected={props.selected}
+                    nodeClass={props.nodeClass}
+                    draggable={draggable()}
+                    kinds={kinds()}
+                    marks={marks()}
+                    as="button"
+                    type="button"
+                    onClick={() => props.onFileClick?.(node)}
+                    onDblClick={() => props.onFileDoubleClick?.(node)}
+                    onContextMenu={() => props.onSelect?.(node.path)}
+                  >
+                    <div class="w-4 shrink-0" />
+                    <Switch>
+                      <Match when={node.ignored}>
                         <FileIcon
                           node={node}
-                          class="size-4 filetree-icon filetree-icon--color opacity-0 group-hover/filetree:opacity-100"
-                        />
-                        <FileIcon
-                          node={node}
-                          class="size-4 filetree-icon filetree-icon--mono group-hover/filetree:opacity-0"
+                          class="size-4 filetree-icon filetree-icon--mono"
+                          style="color: var(--icon-weak-base)"
                           mono
                         />
-                      </span>
-                    </Match>
-                  </Switch>
-                </FileTreeNode>
+                      </Match>
+                      <Match when={active()}>
+                        <FileIcon
+                          node={node}
+                          class="size-4 filetree-icon filetree-icon--mono"
+                          style={kindTextColor(kind()!)}
+                          mono
+                        />
+                      </Match>
+                      <Match when={!node.ignored}>
+                        <span class="filetree-iconpair size-4">
+                          <FileIcon
+                            node={node}
+                            class="size-4 filetree-icon filetree-icon--color opacity-0 group-hover/filetree:opacity-100"
+                          />
+                          <FileIcon
+                            node={node}
+                            class="size-4 filetree-icon filetree-icon--mono group-hover/filetree:opacity-0"
+                            mono
+                          />
+                        </span>
+                      </Match>
+                    </Switch>
+                  </FileTreeNode>
+                </OpenInAppContextMenuV2>
               </Match>
             </Switch>
           )

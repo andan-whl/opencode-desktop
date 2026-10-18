@@ -14,6 +14,7 @@ import { createStore, produce } from "solid-js/store"
 import { Icon } from "@opencode/ui/icon"
 import { encodeFilePath, getFilename } from "@opencode/util/path"
 import {
+  Command,
   createKeyed,
   bindExtension,
   LinkHandler,
@@ -536,6 +537,32 @@ const setup: Setup<typeof File> = (ctx) => {
         </Suspense>
       </FileProvider>
     )),
+  })
+
+  // Lists every expanded directory again from disk, for changes the tree's file events did not pick up.
+  ctx.add(Command, (): Command | undefined => {
+    const screen = ctx.screen.current()
+
+    if (!screen) return undefined
+
+    return {
+      id: "reloadFromDisk",
+      title: ctx.t("command.reloadFromDisk"),
+      group: ctx.t("command.category.file"),
+      run: () => {
+        const file = screen.file
+
+        const reload = (dir: string) => {
+          void file.tree.sync(dir, { force: true })
+
+          for (const node of file.tree.list(dir)) {
+            if (node.type === "directory" && file.tree.state(node.path)?.expanded) reload(node.path)
+          }
+        }
+
+        reload("")
+      },
+    }
   })
 
   /**

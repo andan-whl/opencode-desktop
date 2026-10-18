@@ -1,4 +1,4 @@
-import { createMemo, Match, onCleanup, Show, Switch } from "solid-js"
+import { createMemo, createSignal, Match, onCleanup, Show, Switch } from "solid-js"
 import { Dynamic } from "solid-js/web"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
@@ -12,6 +12,7 @@ import { ScrollView } from "@opencode/ui/scroll-view"
 import type { ChangeKind } from "../review/contract"
 import { createKeyed, useExtension, type MountedSession, type SessionScreen } from "../sdk"
 import { current, useShared } from "./context"
+import { useOpenInApp } from "./open-in-app"
 import FileTree from "./tree"
 import FileSearchView from "./search-view"
 
@@ -21,6 +22,9 @@ export default function FileSidebar(props: { session: MountedSession; screen: Se
   const shared = useShared()
   const file = props.screen.file
   const empty = new Map<string, ChangeKind>()
+  // The row the user last clicked or right-clicked, distinct from the active file the editor focuses.
+  const [selected, setSelected] = createSignal<string>()
+  const openIn = ctx.desktop ? useOpenInApp({ session: props.session, path: () => file.root }) : undefined
   const changes = () => current(shared.changes())
   const view = createMemo(() => file.view.get())
   // The review's own source-control view, which replaces the plain tree while the review extension is active.
@@ -110,9 +114,15 @@ export default function FileSidebar(props: { session: MountedSession; screen: Se
                 path=""
                 class="pt-3"
                 active={activeFile()}
+                selected={selected()}
+                onSelect={setSelected}
+                openIn={openIn}
                 modified={diffFiles()}
                 kinds={kinds()}
-                onFileClick={(node) => shared.open(props.session, node.path)}
+                onFileClick={(node) => {
+                  setSelected(node.path)
+                  shared.open(props.session, node.path)
+                }}
               />
             </ScrollView>
           </div>
