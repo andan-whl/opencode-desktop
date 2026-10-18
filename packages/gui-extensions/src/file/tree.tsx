@@ -108,6 +108,7 @@ const FileTreeNode = (
   return (
     <Dynamic
       component={local.as ?? "div"}
+      data-path={local.node.path}
       classList={{
         "w-full min-w-0 h-6 flex items-center justify-start gap-x-1.5 rounded-md px-1.5 py-0 text-start hover:bg-surface-raised-base-hover active:bg-surface-base-active transition-colors cursor-pointer": true,
         "bg-surface-base-active": local.node.path === local.active,

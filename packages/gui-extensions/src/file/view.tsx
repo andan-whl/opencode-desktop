@@ -371,8 +371,8 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
     ),
   })
 
-  // Mod+F finds in the shown file. Only the read-only code view registers a handle; the editor's own search takes
-  // the event when none is registered.
+  // Mod+F finds in the shown file. The read-only code view and the editor both register a handle; when none is
+  // registered, e.g. an artifact view, the event falls through to the host's timeline search.
   makeEventListener(
     window,
     "keydown",
@@ -534,6 +534,7 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
                         screen={props.screen}
                         path={editPath}
                         content={value().content}
+                        search={search}
                       />
                     </Suspense>
                   )}

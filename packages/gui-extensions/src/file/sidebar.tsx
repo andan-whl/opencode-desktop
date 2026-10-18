@@ -1,11 +1,14 @@
 import { createMemo, Match, onCleanup, Show, Switch } from "solid-js"
 import { Dynamic } from "solid-js/web"
+import { Icon } from "@opencode/ui/icon"
+import { IconButton } from "@opencode/ui/icon-button"
 import {
   displayName,
   getProjectAvatarSource,
   getProjectAvatarVariant,
   ProjectAvatar,
 } from "@opencode/ui/project-avatar"
+import { ScrollView } from "@opencode/ui/scroll-view"
 import type { ChangeKind } from "../review/contract"
 import { createKeyed, useExtension, type MountedSession, type SessionScreen } from "../sdk"
 import { current, useShared } from "./context"
@@ -60,6 +63,16 @@ export default function FileSidebar(props: { session: MountedSession; screen: Se
   const diffFiles = createMemo(() => (changes()?.diffs(props.session) ?? []).map((diff) => diff.file))
   const kinds = createMemo(() => changes()?.kinds(props.session) ?? empty)
 
+  // The middle column's file, shown as the tree's active row. The tree keys paths with forward slashes, and a
+  // path outside the workspace never lists in it, so both stay out of the highlight.
+  const activeFile = createMemo(() => {
+    const path = shared.focusedFile(props.session, props.screen)
+
+    if (!path || file.absolute(path)) return
+
+    return path.replace(/[\\/]+$/, "").replaceAll("\\", "/")
+  })
+
   const nofiles = createMemo(() => {
     const state = file.tree.state("")
 
@@ -80,31 +93,85 @@ export default function FileSidebar(props: { session: MountedSession; screen: Se
     </div>
   )
 
+  let treeHost: HTMLDivElement | undefined
+
   // Without the review extension the source control view falls back to the workspace files, as its tree always did.
+  // The ScrollView is the tree's only scroll container; the panel around it clips without scrolling.
   const files = () => (
     <div class="flex min-h-0 flex-1 flex-col bg-background-stronger px-3 py-0">
       <Switch>
         <Match when={nofiles()}>{emptyState(ctx.t("tree.empty"))}</Match>
         <Match when={true}>
-          <FileTree
-            session={props.session}
-            screen={props.screen}
-            path=""
-            class="pt-3"
-            modified={diffFiles()}
-            kinds={kinds()}
-            onFileClick={(node) => shared.open(props.session, node.path)}
-          />
+          <div ref={treeHost} class="min-h-0 flex-1 overflow-hidden">
+            <ScrollView class="h-full">
+              <FileTree
+                session={props.session}
+                screen={props.screen}
+                path=""
+                class="pt-3"
+                active={activeFile()}
+                modified={diffFiles()}
+                kinds={kinds()}
+                onFileClick={(node) => shared.open(props.session, node.path)}
+              />
+            </ScrollView>
+          </div>
         </Match>
       </Switch>
     </div>
   )
+
+  // Reveals the middle column's file: the explorer view shows, every ancestor directory expands, and the row
+  // scrolls into view once the tree has loaded it. Expansion loads asynchronously, so the row is polled for.
+  const revealActiveFile = () => {
+    const path = activeFile()
+
+    if (!path) return
+
+    if (view() !== "explorer") file.view.set("explorer")
+
+    const parts = path.split("/")
+
+    parts
+      .slice(0, -1)
+      .map((_, idx) => parts.slice(0, idx + 1).join("/"))
+      .forEach((dir) => file.tree.expand(dir))
+
+    const deadline = Date.now() + 2000
+
+    const tick = () => {
+      if (!treeHost) return
+
+      const node = [...treeHost.querySelectorAll<HTMLElement>("[data-path]")].find(
+        (el) => el.dataset.path === path,
+      )
+
+      if (node) {
+        node.scrollIntoView({ block: "center" })
+
+        return
+      }
+
+      if (Date.now() < deadline) setTimeout(tick, 60)
+    }
+
+    tick()
+  }
 
   return (
     <div class="flex h-full flex-col" data-scope="filetree">
       <Show when={!(view() === "scm" && scmView())}>
         <div class="flex h-8 shrink-0 items-center justify-between px-3">
           <div class="truncate text-11-medium uppercase tracking-wide text-text-weak">{title()}</div>
+          <IconButton
+            size="small"
+            variant="ghost"
+            icon={<Icon name="locate" size="small" />}
+            aria-label={ctx.t("tree.locate")}
+            title={ctx.t("tree.locate")}
+            disabled={!activeFile()}
+            onClick={revealActiveFile}
+          />
         </div>
       </Show>
       <Switch>

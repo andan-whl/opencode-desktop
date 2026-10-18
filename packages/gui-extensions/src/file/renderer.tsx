@@ -96,8 +96,21 @@ const setup: Setup<typeof File> = (ctx) => {
     return created
   }
 
-  // The file tab each session screen last selected, for reloads the side panel does not see.
-  const focused = new WeakMap<SessionScreen, string>()
+  // The file tab each session screen last selected, for reloads the side panel does not see. One signal per
+  // screen, so views outside the panel, e.g. the sidebar's active-file highlight, can follow it reactively.
+  const focusedTabs = new WeakMap<SessionScreen, Signal<string | undefined>>()
+
+  const focusedTab = (screen: SessionScreen) => {
+    const existing = focusedTabs.get(screen)
+
+    if (existing) return existing
+
+    const created = createSignal<string | undefined>()
+
+    focusedTabs.set(screen, created)
+
+    return created
+  }
 
   const key = (files: Files, path: string) => `file:${fileTabId(files, path)}`
 
@@ -249,6 +262,13 @@ const setup: Setup<typeof File> = (ctx) => {
     },
     active,
     open,
+    focusedFile(session, screen) {
+      const id = focusedTab(screen)[0]()
+
+      if (!id || !active(session, id)) return
+
+      return fileTabPath(screen.file, id)
+    },
   }
 
   const FileProvider = (props: ParentProps) => (
@@ -370,6 +390,10 @@ const setup: Setup<typeof File> = (ctx) => {
     },
     close(input) {
       tabs.get(input.screen)?.delete(input.tab.id)
+
+      const [focused, setFocused] = focusedTab(input.screen)
+
+      if (focused() === input.tab.id) setFocused(undefined)
     },
     render: (props) => {
       const panel = usePanel()
@@ -390,7 +414,7 @@ const setup: Setup<typeof File> = (ctx) => {
     focus(input) {
       if (!isFileTab(input.tab.id)) return
 
-      focused.set(input.screen, input.tab.id)
+      focusedTab(input.screen)[1](input.tab.id)
       void input.screen.file.sync(fileTabPath(input.screen.file, input.tab.id))
 
       // A restored file tab keeps the tree tab the user left, e.g. Changes across a reload.
@@ -674,7 +698,7 @@ const setup: Setup<typeof File> = (ctx) => {
 
     if (!session || !screen) return
 
-    const id = focused.get(screen)
+    const id = focusedTab(screen)[0]()
 
     if (id && active(session, id)) void screen.file.sync(fileTabPath(screen.file, id), { force: true })
   })

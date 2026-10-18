@@ -18,6 +18,10 @@ const icons = {
     viewBox: "0 0 16 16",
     body: `<path d="M5.5 2H10.5M6 2V6L2.5 12C2 13 2.5 14 3.5 14H12.5C13.5 14 14 13 13.5 12L10 6V2M4.25 9H11.75" stroke="currentColor" stroke-linecap="square" stroke-linejoin="round"/>`,
   },
+  locate: {
+    viewBox: "0 0 16 16",
+    body: `<circle cx="8" cy="8" r="4" stroke="currentColor"/><path d="M8 1.5V4.5M8 11.5V14.5M1.5 8H4.5M11.5 8H14.5" stroke="currentColor" stroke-linecap="round"/><circle cx="8" cy="8" r="0.5" fill="currentColor"/>`,
+  },
   edit: {
     viewBox: "0 0 16 16",
     body: `<path d="M13.5556 8.21529V13.5556H2.44446L2.44446 2.44445H7.78474M6.00002 8.16216V10H7.83786L14 3.83784L12.1622 2L6.00002 8.16216Z" stroke="currentColor"/>`,
@@ -89,6 +93,10 @@ const icons = {
   "chevron-down": {
     viewBox: "0 0 16 16",
     body: `<path d="M5 6.5L8 9.5L11 6.5" stroke="currentColor"/>`,
+  },
+  "chevron-up": {
+    viewBox: "0 0 16 16",
+    body: `<path d="M5 9.5L8 6.5L11 9.5" stroke="currentColor"/>`,
   },
   collapse: {
     viewBox: "0 0 16 16",

@@ -1,7 +1,7 @@
 import { createContext, useContext, type Accessor } from "solid-js"
 import type { Browser } from "../browser/contract"
 import type { Changes, ScmView } from "../review/contract"
-import type { LineRange, Live, MountedSession, OpenOptions } from "../sdk"
+import type { LineRange, Live, MountedSession, OpenOptions, SessionScreen } from "../sdk"
 import type { OpenApp } from "./apps"
 
 export type TreeTab = "changes" | "all"
@@ -77,6 +77,11 @@ export interface FileShared {
   /** The tab is the session's selected side tab. */
   active(session: MountedSession, id: string): boolean
   open(session: MountedSession, path: string, options?: OpenOptions): void
+  /**
+   * The screen's active file tab's workspace path, or undefined while none is focused. Reactive, so the
+   * sidebar can highlight the file the middle column edits as it changes.
+   */
+  focusedFile(session: MountedSession, screen: SessionScreen): string | undefined
 }
 
 export const FileContext = createContext<FileShared>()

@@ -2,7 +2,7 @@
   "name": "@opencode/desktop",
   "private": true,
   "version": "2.0.28",
-  "desktopVersion": "1.0.3",
+  "desktopVersion": "1.0.4",
   "type": "module",
   "license": "MIT",
   "author": {
@@ -20,6 +20,7 @@
     "package:mac": "electron-builder --mac --config electron-builder.config.ts",
     "package:win": "electron-builder --win --config electron-builder.config.ts",
     "package:full": "bun ./scripts/package-full.ts",
+    "package:local": "bun ./scripts/package-local.ts",
     "package:linux": "electron-builder --linux --config electron-builder.config.ts",
     "bench:startup": "bun ./scripts/bench-startup.ts"
   },

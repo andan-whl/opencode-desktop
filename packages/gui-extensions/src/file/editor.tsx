@@ -1,5 +1,7 @@
-import { createSignal, onCleanup, onMount, Show } from "solid-js"
+import { createMemo, createSignal, onCleanup, onMount, Show } from "solid-js"
 import { Button } from "@opencode/ui/button"
+import { Icon } from "@opencode/ui/icon"
+import { IconButton } from "@opencode/ui/icon-button"
 import { showToast } from "@opencode/ui/toast"
 import { getDirectory } from "@opencode/util/path"
 import { Compartment, EditorState, type Extension } from "@codemirror/state"
@@ -18,8 +20,18 @@ import {
 } from "@codemirror/view"
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands"
 import { bracketMatching, foldGutter, HighlightStyle, indentOnInput, syntaxHighlighting } from "@codemirror/language"
-import { highlightSelectionMatches, searchKeymap } from "@codemirror/search"
+import {
+  findNext,
+  findPrevious,
+  highlightSelectionMatches,
+  SearchCursor,
+  SearchQuery,
+  search,
+  searchKeymap,
+  setSearchQuery,
+} from "@codemirror/search"
 import { tags } from "@lezer/highlight"
+import type { FileSearchHandle } from "@opencode/session-ui/file"
 import { createKeyed, useExtension, type LineRange, type MountedSession, type SessionScreen } from "../sdk"
 import { useShared } from "./context"
 import { editorLanguage } from "./editor-language"
@@ -147,6 +159,7 @@ export default function FileEditor(props: {
   screen: SessionScreen
   path: string
   content: string
+  search: { register(handle: FileSearchHandle | null): void }
 }) {
   const ctx = useExtension()
   const shared = useShared()
@@ -161,7 +174,56 @@ export default function FileEditor(props: {
   const editable = new Compartment()
   const [failed, setFailed] = createSignal<string>()
   const [savedFlash, setSavedFlash] = createSignal(false)
+  const [findOpen, setFindOpen] = createSignal(false)
+  const [findText, setFindText] = createSignal("")
+  // Bumped by the editor's update listener, so the find bar's counter follows typing and selection moves.
+  const [findTick, setFindTick] = createSignal(0)
+  let findInput: HTMLInputElement | undefined
   let flashTimer: ReturnType<typeof setTimeout> | undefined
+
+  // The find bar's x/y counter: how many matches the document holds, and which one a find steps to next.
+  const matches = createMemo(() => {
+    const text = findText()
+    findTick()
+    const current = view
+
+    if (!current || !text) return { total: 0, active: 0 }
+
+    let total = 0
+    let before = 0
+    const head = current.state.selection.main.head
+    // The lowercasing normalize makes the count case-insensitive, like the find bar's stepping.
+    const cursor = new SearchCursor(current.state.doc, text, 0, undefined, (value) => value.toLowerCase())
+
+    while (!cursor.next().done) {
+      total++
+
+      if (cursor.value.from < head) before++
+    }
+
+    return { total, active: total === 0 ? 0 : (before % total) + 1 }
+  })
+
+  const findStep = (forward: boolean) => {
+    const current = view
+
+    if (!current) return
+
+    if (forward) findNext(current)
+    else findPrevious(current)
+  }
+
+  const closeFind = () => {
+    setFindOpen(false)
+    view?.focus()
+    view?.dispatch({ effects: setSearchQuery.of(new SearchQuery({ search: "" })) })
+  }
+
+  // The editor's search query follows the find bar's text: the query drives CodeMirror's match
+  // highlighting, and findNext/findPrevious step through its results.
+  createKeyed(() => findText(), (text) => {
+    view?.dispatch({ effects: setSearchQuery.of(new SearchQuery({ search: text })) })
+  })
 
   // The unsaved text is kept only while it differs from disk, so an idle draft costs no memory beyond its view.
   const storeDraft = () => {
@@ -264,6 +326,8 @@ export default function FileEditor(props: {
           EditorState.allowMultipleSelections.of(true),
           indentOnInput(),
           syntaxHighlighting(highlight),
+          // Holds the find bar's query, which lights the document's matches.
+          search(),
           bracketMatching(),
           rectangularSelection(),
           crosshairCursor(),
@@ -278,9 +342,9 @@ export default function FileEditor(props: {
             { key: "Mod-s", preventDefault: true, run: save },
           ]),
           EditorView.updateListener.of((update) => {
-            if (!update.docChanged) return
+            if (update.docChanged) storeDraft()
 
-            storeDraft()
+            if (update.docChanged || update.selectionSet) setFindTick((tick) => tick + 1)
           }),
           language.of([]),
           editable.of([]),
@@ -305,9 +369,20 @@ export default function FileEditor(props: {
 
       created.dispatch({ effects: language.reconfigure(extension) })
     })
+
+    props.search.register({
+      focus: () => {
+        setFindOpen(true)
+        requestAnimationFrame(() => {
+          findInput?.focus()
+          findInput?.select()
+        })
+      },
+    })
   })
 
   onCleanup(() => {
+    props.search.register(null)
     storeDraft()
     view?.destroy()
     view = undefined
@@ -372,6 +447,54 @@ export default function FileEditor(props: {
   return (
     <div class="relative min-h-0 flex-1">
       <div ref={host} class="h-full overflow-hidden" />
+      {/* The in-file find bar: text, a x/y counter, and stepping; Enter and Shift+Enter step, Escape closes. */}
+      <Show when={findOpen()}>
+        <div class="absolute end-3 top-3 z-10 flex items-center gap-1 rounded-md border border-v2-border-border-muted bg-v2-background-bg-base px-2 py-1 shadow-[var(--v2-elevation-raised)]">
+          <input
+            ref={findInput}
+            class="w-44 bg-transparent text-12-regular text-text-base outline-none placeholder:text-text-faint"
+            placeholder={ctx.t("editor.find.placeholder")}
+            aria-label={ctx.t("editor.find.placeholder")}
+            value={findText()}
+            onInput={(event) => setFindText(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault()
+                findStep(!event.shiftKey)
+              }
+
+              if (event.key === "Escape") {
+                event.preventDefault()
+                closeFind()
+              }
+            }}
+          />
+          <span class="shrink-0 text-11-regular text-text-weak">
+            {ctx.t("editor.find.matches", { active: matches().active, total: matches().total })}
+          </span>
+          <IconButton
+            size="small"
+            variant="ghost"
+            icon={<Icon name="chevron-up" size="small" />}
+            aria-label={ctx.t("editor.find.previous")}
+            onClick={() => findStep(false)}
+          />
+          <IconButton
+            size="small"
+            variant="ghost"
+            icon={<Icon name="chevron-down" size="small" />}
+            aria-label={ctx.t("editor.find.next")}
+            onClick={() => findStep(true)}
+          />
+          <IconButton
+            size="small"
+            variant="ghost"
+            icon={<Icon name="close" size="small" />}
+            aria-label={ctx.t("editor.find.close")}
+            onClick={closeFind}
+          />
+        </div>
+      </Show>
       <Show when={savedFlash()}>
         <div class="pointer-events-none absolute end-3 top-3 rounded-md bg-v2-background-bg-base px-2 py-1 text-12-medium text-text-weak shadow-[var(--v2-elevation-raised)]">
           {ctx.t("editor.saved")}
