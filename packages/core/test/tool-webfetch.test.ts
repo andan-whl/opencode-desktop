@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Duration, Effect, Fiber, Layer, Schema } from "effect"
 import * as TestClock from "effect/testing/TestClock"
-import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http"
+import { HttpClient, HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/http"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { LayerNodePlatform } from "@opencode/util/effect/app-node-platform"
@@ -27,7 +27,7 @@ const webFetchUserAgent =
   "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; OpenCode-User/1.0; +https://opencode.ai"
 const requests: Array<{ readonly url: string; readonly headers: Record<string, string> }> = []
 const assertions: Permission.AssertInput[] = []
-let respond = (_request: HttpClientRequest.HttpClientRequest) =>
+let respond = (_request: HttpClientRequest.HttpClientRequest): Effect.Effect<Response, HttpClientError.HttpClientError> =>
   Effect.succeed(new Response("hello", { headers: { "content-type": "text/plain" } }))
 
 const http = Layer.succeed(
@@ -67,6 +67,21 @@ describe("WebFetchTool helpers", () => {
     expect(decode({ url: "https://example.com" })).toEqual({ url: "https://example.com", format: "markdown" })
     expect(() => decode({ url: "https://example.com", timeout: 0 })).toThrow()
     expect(() => decode({ url: "https://example.com", timeout: WebFetchTool.MAX_TIMEOUT_SECONDS + 1 })).toThrow()
+  })
+
+  test("maps blocked-network fallbacks to mainland-reachable mirrors", () => {
+    expect(WebFetchTool.fallbackUrls("https://huggingface.co/api/models/org/model?full=true")).toEqual([
+      "https://hf-mirror.com/api/models/org/model?full=true",
+    ])
+    expect(WebFetchTool.fallbackUrls("https://github.com/pytorch/pytorch/blob/main/README.md")).toEqual([
+      "https://gh-proxy.com/https://github.com/pytorch/pytorch/blob/main/README.md",
+    ])
+    expect(WebFetchTool.fallbackUrls("https://raw.githubusercontent.com/pytorch/pytorch/main/README.md")).toEqual([
+      "https://gh-proxy.com/https://raw.githubusercontent.com/pytorch/pytorch/main/README.md",
+    ])
+    expect(WebFetchTool.fallbackUrls("https://docs.comfy.org/tutorials/utility/seedvr2")).toEqual([])
+    expect(WebFetchTool.fallbackUrls("file:///etc/passwd")).toEqual([])
+    expect(WebFetchTool.fallbackUrls("not a url")).toEqual([])
   })
 
   test("ports HTML text and markdown conversions without active content", () => {
@@ -660,6 +675,76 @@ describe("WebFetchTool registration", () => {
         status: "error",
         error: { type: "unknown", message: "Request timed out" },
       })
+    }),
+  )
+
+  it.effect("falls back to the HF mirror when the direct transport fails", () =>
+    Effect.gen(function* () {
+      reset()
+      respond = (request) =>
+        request.url.startsWith("https://hf-mirror.com/")
+          ? Effect.succeed(new Response("mirror", { headers: { "content-type": "application/json" } }))
+          : Effect.fail(
+              new HttpClientError.HttpClientError({
+                reason: new HttpClientError.TransportError({ request, description: "connection reset" }),
+              }),
+            )
+      const registry = yield* Tool.Service
+      const url = "https://huggingface.co/api/models/Comfy-Org/MiniMax-H3"
+
+      expect(yield* executeTool(registry, call({ url, format: "text" }))).toEqual({
+        status: "completed",
+        output: {
+          url,
+          contentType: "application/json",
+          format: "text",
+          output: "mirror",
+        },
+        content: [{ type: "text", text: "mirror" }],
+        metadata: { contentType: "application/json", fetchedUrl: "https://hf-mirror.com/api/models/Comfy-Org/MiniMax-H3" },
+      })
+      expect(requests.map((request) => request.url)).toEqual([url, "https://hf-mirror.com/api/models/Comfy-Org/MiniMax-H3"])
+    }),
+  )
+
+  it.effect("falls back to the GitHub proxy when the direct transport fails", () =>
+    Effect.gen(function* () {
+      reset()
+      respond = (request) =>
+        request.url.startsWith("https://gh-proxy.com/")
+          ? Effect.succeed(new Response("proxy", { headers: { "content-type": "text/plain" } }))
+          : Effect.fail(
+              new HttpClientError.HttpClientError({ reason: new HttpClientError.TransportError({ request }) }),
+            )
+      const registry = yield* Tool.Service
+      const url = "https://raw.githubusercontent.com/pytorch/pytorch/main/README.md"
+
+      expect(yield* executeTool(registry, call({ url, format: "markdown" }))).toEqual({
+        status: "completed",
+        output: {
+          url,
+          contentType: "text/plain",
+          format: "markdown",
+          output: "proxy",
+        },
+        content: [{ type: "text", text: "proxy" }],
+        metadata: { contentType: "text/plain", fetchedUrl: `https://gh-proxy.com/${url}` },
+      })
+      expect(requests.map((request) => request.url)).toEqual([url, `https://gh-proxy.com/${url}`])
+    }),
+  )
+
+  it.effect("does not fall back on HTTP status errors", () =>
+    Effect.gen(function* () {
+      reset()
+      respond = () => Effect.succeed(new Response("not found", { status: 404 }))
+      const registry = yield* Tool.Service
+      const url = "https://example.com/missing"
+
+      expect(yield* executeTool(registry, call({ url, format: "text" }))).toMatchObject({
+        status: "error",
+      })
+      expect(requests.map((request) => request.url)).toEqual([url])
     }),
   )
 })

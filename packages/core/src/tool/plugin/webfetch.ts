@@ -2,8 +2,8 @@ export * as WebFetchTool from "./webfetch.js"
 
 import type { Context } from "@opencode/plugin/effect/plugin"
 import { ToolFailure } from "@opencode/ai"
-import { Duration, Effect, Schema } from "effect"
-import { HttpClient, type HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/http"
+import { Cause, Duration, Effect, Exit, Schema } from "effect"
+import { HttpClient, type HttpClientError, HttpClientError as HttpClientErrorClass, HttpClientRequest, HttpClientResponse } from "effect/http"
 import { Parser } from "htmlparser2"
 import { Permission } from "../../permission.js"
 import { convertHTMLToMarkdown, MAX_MARKDOWN_BYTES } from "../html-markdown.js"
@@ -13,6 +13,28 @@ export const name = "webfetch"
 export const MAX_RESPONSE_BYTES = MAX_MARKDOWN_BYTES
 export const DEFAULT_TIMEOUT_SECONDS = 30
 export const MAX_TIMEOUT_SECONDS = 120
+
+/**
+ * Mainland-China-friendly fallbacks for URLs whose direct fetch fails at the transport layer
+ * (the failure shape of blocked networks). HuggingFace has a path-compatible community mirror
+ * (hf-mirror.com) and GitHub hosts are proxied through gh-proxy.com (prefix-style); both are
+ * reachable without a proxy. Other hosts have no reliable free mainland mirror, so they get
+ * no fallback. Only http(s) URLs get fallbacks.
+ */
+export const fallbackUrls = (input: string): string[] => {
+  let url: URL
+  try {
+    url = new URL(input)
+  } catch {
+    return []
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return []
+  if (url.hostname === "huggingface.co")
+    return [`https://hf-mirror.com${url.pathname}${url.search}${url.hash}`]
+  if (url.hostname === "github.com" || url.hostname.endsWith(".githubusercontent.com"))
+    return [`https://gh-proxy.com/${input}`]
+  return []
+}
 
 export const description = `Fetch content from an HTTP or HTTPS URL and return it as text, markdown, or HTML. Markdown is the default.
 
@@ -74,6 +96,34 @@ const assertHttpUrl = (url: URL) => {
 const execute = (http: HttpClient.HttpClient, url: string, format: Format, userAgent = openCodeUserAgent) =>
   http.execute(request(url, format, userAgent)).pipe(Effect.flatMap(HttpClientResponse.filterStatusOk))
 
+/** Marks a per-attempt timeout so later fallbacks can still run within the user's budget. */
+class RequestTimeoutError extends Error {
+  constructor() {
+    super("Request timed out")
+  }
+}
+
+// Only transport-level failures (blocked or unreachable networks) fall back to mirrors/relays;
+// HTTP status errors mean the server answered, so a fallback URL cannot change the outcome.
+// The fetch client reports transport failures as HttpClientError wrapping a TransportError reason.
+const isRetriable = (error: unknown) =>
+  error instanceof RequestTimeoutError ||
+  (error instanceof HttpClientErrorClass.HttpClientError && error.reason._tag === "TransportError")
+
+const fetchFrom = (http: HttpClient.HttpClient, url: string, format: Format) =>
+  Effect.gen(function* () {
+    const response = yield* execute(http, url, format).pipe(
+      Effect.catchIf(isCloudflareChallenge, () => execute(http, url, format, "opencode")),
+    )
+    const contentType = response.headers["content-type"] || ""
+    const mime = mimeFrom(contentType)
+    if (isImageAttachment(mime))
+      return yield* Effect.fail(new Error(`Unsupported fetched image content type: ${mime}`))
+    if (!isTextualMime(mime))
+      return yield* Effect.fail(new Error(`Unsupported fetched file content type: ${mime}`))
+    return { body: yield* collectBody(response), contentType }
+  })
+
 const collectBody = (response: HttpClientResponse.HttpClientResponse) =>
   collectBoundedResponseBody(
     response,
@@ -131,35 +181,49 @@ export const Plugin = {
                 source: { type: "tool", messageID: context.messageID, id: context.id },
               })
 
-              const { body, contentType } = yield* Effect.gen(function* () {
-                const response = yield* execute(http, input.url, input.format).pipe(
-                  Effect.catchIf(isCloudflareChallenge, () => execute(http, input.url, input.format, "opencode")),
-                )
-                const contentType = response.headers["content-type"] || ""
-                const mime = mimeFrom(contentType)
-                if (isImageAttachment(mime))
-                  return yield* Effect.fail(new Error(`Unsupported fetched image content type: ${mime}`))
-                if (!isTextualMime(mime))
-                  return yield* Effect.fail(new Error(`Unsupported fetched file content type: ${mime}`))
-                return { body: yield* collectBody(response), contentType }
-              }).pipe(
-                Effect.timeoutOrElse({
-                  duration: Duration.seconds(input.timeout ?? DEFAULT_TIMEOUT_SECONDS),
-                  orElse: () => Effect.fail(new Error("Request timed out")),
-                }),
+              // Direct fetch first; mainland-friendly mirrors and relays only when the transport
+              // layer fails. The user's timeout is split evenly across the attempts.
+              const candidates = [input.url, ...fallbackUrls(input.url)]
+              const perAttempt = Duration.millis(
+                Math.max((input.timeout ?? DEFAULT_TIMEOUT_SECONDS) * 1000 / candidates.length, 250),
               )
-              const content = new TextDecoder().decode(body)
+              const attempt = (url: string) =>
+                fetchFrom(http, url, input.format).pipe(
+                  Effect.timeoutOrElse({ duration: perAttempt, orElse: () => Effect.fail(new RequestTimeoutError()) }),
+                )
+
+              let fetched: { body: Uint8Array; contentType: string; url: string } | undefined
+              let failure: unknown
+              for (const url of candidates) {
+                const outcome = yield* attempt(url).pipe(Effect.exit)
+                if (Exit.isSuccess(outcome)) {
+                  fetched = { ...outcome.value, url }
+                  break
+                }
+                failure = Cause.squash(outcome.cause)
+                if (!isRetriable(failure)) return yield* Effect.fail(failure)
+              }
+              if (!fetched) return yield* Effect.fail(failure)
+
+              const content = new TextDecoder().decode(fetched.body)
               const output = yield* Effect.try({
-                try: () => convert(content, contentType, input.format),
+                try: () => convert(content, fetched.contentType, input.format),
                 catch: (error) => error,
               })
               const result = {
                 url: input.url,
-                contentType,
+                contentType: fetched.contentType,
                 format: input.format,
                 output,
               }
-              return { output: result, content: result.output, metadata: { contentType: result.contentType } }
+              return {
+                output: result,
+                content: result.output,
+                metadata: {
+                  contentType: result.contentType,
+                  ...(fetched.url !== input.url ? { fetchedUrl: fetched.url } : {}),
+                },
+              }
             }).pipe(Effect.mapError((error) => new ToolFailure({ message: `Unable to fetch ${input.url}`, error }))),
         }),
       )
