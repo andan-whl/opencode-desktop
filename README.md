@@ -1,6 +1,6 @@
 # OpenCodeDesktop
 
-**OpenCodeDesktop** is a personal AI coding assistant client — a privacy-first independent client based on [opencode](https://github.com/sst/opencode), the open source AI coding agent by SST/Anomaly Innovations. Client version 1.0.2.
+**OpenCodeDesktop** is a personal AI coding assistant client — a privacy-first independent client based on [opencode](https://github.com/sst/opencode), the open source AI coding agent by SST/Anomaly Innovations. Client version 1.0.7.
 
 This fork keeps opencode's full agent engineering stack and desktop client, but removes everything that phones home. Your API keys, prompts, and code never leave your machine.
 
