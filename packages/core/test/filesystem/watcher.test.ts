@@ -623,6 +623,33 @@ describeNative("LocationWatcher", () => {
     ),
   )
 
+  it.live(
+    "publishes workspace file events when the experimental watcher is enabled",
+    () =>
+      Effect.gen(function* () {
+        const previous = process.env.OPENCODE_EXPERIMENTAL_FILEWATCHER
+        process.env.OPENCODE_EXPERIMENTAL_FILEWATCHER = "true"
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => {
+            if (previous === undefined) delete process.env.OPENCODE_EXPERIMENTAL_FILEWATCHER
+            else process.env.OPENCODE_EXPERIMENTAL_FILEWATCHER = previous
+          }),
+        )
+        yield* withTmp(
+          (directory) =>
+            Effect.gen(function* () {
+              const fs = yield* FSUtil.Service
+              const created = path.join(directory, "workspace-watched.txt")
+              expect(
+                yield* nextUpdate((event) => event.file === created, fs.writeFileString(created, "content")),
+              ).toEqual({ file: created, event: "add" })
+            }),
+          { vcs: "git" },
+        )
+      }),
+    15_000,
+  )
+
   const describeSymlink = process.platform !== "win32" ? describe : describe.skip
   describeSymlink("symlinked .git", () => {
     it.live("publishes .git/HEAD events through a symlinked .git directory", () =>

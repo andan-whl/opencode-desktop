@@ -1,6 +1,6 @@
 import http from "node:http"
 import { getCACertificates, setDefaultCACertificates } from "node:tls"
-import { app } from "electron"
+import { app, session } from "electron"
 import { Effect, Path } from "effect"
 import { DesktopPaths } from "../paths"
 import { getUserShell, loadShellEnv } from "../service/shell-env"
@@ -45,6 +45,32 @@ export const prepareDesktop = Effect.gen(function* () {
   )
   registerRendererProtocol(paths.rendererRoot)
   setDockIcon(path, paths)
+  yield* resolveSystemProxy
+})
+
+// The CLI service's fetch (webfetch tool, LLM calls) only honors HTTP(S)_PROXY environment
+// variables, but a desktop system proxy lives in OS settings, not the environment. Resolve it
+// through Chromium and export it before the CLI child spawns, so regions that need a proxy for
+// outbound requests get working webfetch without manual environment setup.
+const resolveSystemProxy = Effect.gen(function* () {
+  yield* Effect.tryPromise({
+    try: async () => {
+      // Explicit environment configuration wins over the system proxy.
+      if (process.env.HTTPS_PROXY || process.env.https_proxy) return
+      const rules = await session.defaultSession.resolveProxy("https://opencode.ai")
+      // "PROXY host:port" is a plain HTTP proxy; "HTTPS"/"SOCKS" schemes are not representable
+      // in the env variables Bun's fetch reads, so only PROXY entries are applied.
+      const entry = rules
+        .split(";")
+        .map((rule) => rule.trim())
+        .find((rule) => /^PROXY\s+/i.test(rule))
+      if (!entry) return
+      const proxy = `http://${entry.split(/\s+/)[1]}`
+      process.env.HTTP_PROXY = proxy
+      process.env.HTTPS_PROXY = proxy
+    },
+    catch: (error) => new Error(String(error)),
+  }).pipe(Effect.catch((error) => Effect.logWarning("failed to resolve system proxy", { error })))
 })
 
 export const loadProxyEnvironment = Effect.gen(function* () {

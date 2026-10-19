@@ -87,6 +87,28 @@ const layer = Layer.effect(
       ),
     )
     yield* policy.observe(reconcile)
+    // The desktop opts into whole-workspace watching (OPENCODE_EXPERIMENTAL_FILEWATCHER) so its
+    // file tree refreshes on external changes. VCS internals and dependency trees are excluded:
+    // they churn without changing anything the tree shows, and .git/HEAD already has its own watch.
+    if (process.env.OPENCODE_EXPERIMENTAL_FILEWATCHER === "true") {
+      const workspaceScope = yield* Scope.make()
+      yield* Effect.gen(function* () {
+        const updates = yield* watcher.subscribe({
+          path: location.directory,
+          type: "directory",
+          ignore: [".git", ".hg", "node_modules"],
+        })
+        yield* Stream.runForEach(updates, publish)
+      }).pipe(
+        Effect.catchCauseIf(
+          (cause) => !Cause.hasInterrupts(cause),
+          (cause) =>
+            Effect.logError("workspace watcher subscription failed", { path: location.directory, cause }),
+        ),
+        Effect.forkIn(workspaceScope, { startImmediately: true }),
+      )
+      yield* Effect.addFinalizer(() => Scope.close(workspaceScope, Exit.void))
+    }
     yield* Effect.gen(function* () {
       yield* Plugin.awaitActivation
       yield* reconcile()
