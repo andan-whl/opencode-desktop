@@ -165,14 +165,19 @@ export default function FileEditor(props: {
   const shared = useShared()
   const file = props.screen.file
   const draft = shared.edit.get(file.root, props.path)
-  // The disk content the editor last knew; the dirty check compares the document against it.
-  let saved = props.content
+  // The disk content the editor last knew; the dirty check compares the document against it. A restored draft
+  // keeps the baseline it was written against, so an externally rewritten file conflicts rather than hiding
+  // behind the model's current content.
+  let saved = draft?.text !== undefined ? (draft.baseline ?? props.content) : props.content
   let saving = false
   let view: EditorView | undefined
   let host: HTMLDivElement | undefined
   const language = new Compartment()
   const editable = new Compartment()
   const [failed, setFailed] = createSignal<string>()
+  // The disk changed behind unsaved edits, e.g. the task or another program rewrote the file; a save would
+  // silently drop those external changes, so the user decides between them first.
+  const [conflict, setConflict] = createSignal(false)
   const [savedFlash, setSavedFlash] = createSignal(false)
   const [findOpen, setFindOpen] = createSignal(false)
   const [findText, setFindText] = createSignal("")
@@ -226,6 +231,7 @@ export default function FileEditor(props: {
   })
 
   // The unsaved text is kept only while it differs from disk, so an idle draft costs no memory beyond its view.
+  // The baseline travels with it, so a later view knows which disk version the edits sit on.
   const storeDraft = () => {
     const current = view
 
@@ -236,6 +242,7 @@ export default function FileEditor(props: {
 
     shared.edit.set(file.root, props.path, {
       text: text === saved ? undefined : text,
+      baseline: text === saved ? undefined : saved,
       top: current.scrollDOM.scrollTop,
       anchor: selection.anchor,
       head: selection.head,
@@ -257,14 +264,14 @@ export default function FileEditor(props: {
     })
   }
 
-  const save = () => {
+  // Writes the document without further checks; the save path calls this once the disk baseline holds or the
+  // user chose to overwrite.
+  const write = () => {
     const current = view
 
-    if (!current || saving) return true
+    if (!current || saving) return
 
     const text = current.state.doc.toString()
-
-    if (text === saved) return true
 
     saving = true
     const path = props.path
@@ -283,6 +290,7 @@ export default function FileEditor(props: {
 
         saved = text
         setFailed(undefined)
+        setConflict(false)
         storeDraft()
 
         setSavedFlash(true)
@@ -304,8 +312,74 @@ export default function FileEditor(props: {
         setFailed(message)
         showToast({ variant: "error", title: ctx.t("editor.saveFailed"), description: message })
       })
+  }
+
+  // A save first checks the disk still holds the content the editor last knew: a task or another program may
+  // have rewritten the file since, and writing the document would silently drop those changes.
+  const save = () => {
+    const current = view
+
+    if (!current || saving) return true
+
+    const text = current.state.doc.toString()
+
+    if (text === saved) return true
+
+    saving = true
+    const path = props.path
+
+    void file
+      .sync(path, { force: true })
+      .then(() => {
+        saving = false
+
+        if (!view) return
+
+        // The disk content the editor never saw means the baseline moved; the user decides between the versions.
+        if ((file.get(path)?.content?.content ?? saved) !== saved) {
+          setConflict(true)
+
+          return
+        }
+
+        write()
+      })
+      .catch(() => {
+        saving = false
+
+        // The check failed, e.g. the server is unreachable; keep the old direct-save behaviour.
+        write()
+      })
 
     return true
+  }
+
+  // Replaces the document with the disk's current content, dropping the edits that sat on the old baseline.
+  const loadDiskVersion = () => {
+    const current = view
+
+    if (!current) return
+
+    void file
+      .sync(props.path, { force: true })
+      .then(() => {
+        const content = file.get(props.path)?.content?.content
+
+        if (!view || content === undefined) return
+
+        saved = content
+        const top = current.scrollDOM.scrollTop
+
+        current.dispatch({ changes: { from: 0, to: current.state.doc.length, insert: content } })
+        current.scrollDOM.scrollTop = top
+        storeDraft()
+        setConflict(false)
+      })
+      .catch(() => {
+        if (!view) return
+
+        setConflict(false)
+      })
   }
 
   onMount(() => {
@@ -402,11 +476,18 @@ export default function FileEditor(props: {
 
       if (text === content) {
         saved = content
+        setConflict(false)
 
         return
       }
 
-      if (text !== saved) return
+      if (text !== saved) {
+        // Unsaved edits on a baseline the disk no longer holds: a save would drop the external changes, so
+        // the conflict shows now rather than at the save.
+        if (content !== saved) setConflict(true)
+
+        return
+      }
 
       saved = content
       const top = current.scrollDOM.scrollTop
@@ -498,6 +579,20 @@ export default function FileEditor(props: {
       <Show when={savedFlash()}>
         <div class="pointer-events-none absolute end-3 top-3 rounded-md bg-v2-background-bg-base px-2 py-1 text-12-medium text-text-weak shadow-[var(--v2-elevation-raised)]">
           {ctx.t("editor.saved")}
+        </div>
+      </Show>
+      <Show when={conflict() && !failed()}>
+        <div class="absolute inset-x-3 top-3 flex items-center gap-2 rounded-md border border-v2-border-border-muted bg-v2-background-bg-base px-3 py-2 text-12-regular text-text-base shadow-[var(--v2-elevation-raised)]">
+          <span class="min-w-0 flex-1 truncate">{ctx.t("editor.conflict")}</span>
+          <Button size="small" variant="ghost" onClick={loadDiskVersion}>
+            {ctx.t("editor.conflict.reload")}
+          </Button>
+          <Button size="small" variant="ghost" onClick={write}>
+            {ctx.t("editor.conflict.overwrite")}
+          </Button>
+          <Button size="small" variant="ghost" onClick={() => setConflict(false)}>
+            {ctx.t("editor.conflict.keepEditing")}
+          </Button>
         </div>
       </Show>
       <Show when={failed()}>

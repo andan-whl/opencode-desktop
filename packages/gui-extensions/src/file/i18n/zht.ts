@@ -43,4 +43,8 @@ export default {
   "command.open": "開啟檔案",
   "command.category.file": "檔案",
   "command.reloadFromDisk": "從磁碟重新載入全部檔案",
+  "editor.conflict": "磁碟上的檔案已被修改（如任務或其他程式），你的未儲存編輯基於舊版本。",
+  "editor.conflict.reload": "載入磁碟版本",
+  "editor.conflict.overwrite": "用我的編輯覆蓋",
+  "editor.conflict.keepEditing": "繼續編輯",
 }

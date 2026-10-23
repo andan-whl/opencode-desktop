@@ -43,4 +43,8 @@ export default {
   "command.open": "打开文件",
   "command.category.file": "文件",
   "command.reloadFromDisk": "从磁盘重新加载全部文件",
+  "editor.conflict": "磁盘上的文件已被修改（如任务或其他程序），你的未保存编辑基于旧版本。",
+  "editor.conflict.reload": "加载磁盘版本",
+  "editor.conflict.overwrite": "用我的编辑覆盖",
+  "editor.conflict.keepEditing": "继续编辑",
 }

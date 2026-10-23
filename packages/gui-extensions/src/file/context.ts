@@ -25,6 +25,8 @@ export interface FileDraft {
   readonly head: number
   /** The unsaved text; present only while it differs from the file on disk. */
   readonly text?: string
+  /** The disk content the unsaved text was written against; present only with `text`. */
+  readonly baseline?: string
 }
 
 /** Per-window file state that setup owns and its lazily loaded views share. */
