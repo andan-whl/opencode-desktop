@@ -285,9 +285,6 @@ function SessionScreenContent(props: {
           throw error()
         }}
       </Show>
-      <Show when={isDesktop() && !!session.identity.params.id}>
-        <SessionChangedFiles session={session} />
-      </Show>
       <div class="relative flex-1 min-h-0 overflow-hidden">
         <Show when={!isDesktop() && store.mobileDockCached}>
           <div class="absolute inset-0" classList={{ invisible: mobileView() !== dockView()?.key }}>
@@ -334,6 +331,13 @@ function SessionScreenContent(props: {
           </Match>
         </Switch>
       </div>
+
+      {/* The session's changed files sit directly above the composer, aligned with its width. */}
+      <Show when={isDesktop() && !!session.identity.params.id}>
+        <div class="w-full shrink-0 px-3 md:max-w-session md:mx-auto">
+          <SessionChangedFiles session={session} />
+        </div>
+      </Show>
 
       <Show when={composer.active()} keyed>
         {(model) => (

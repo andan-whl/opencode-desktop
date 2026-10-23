@@ -56,7 +56,7 @@ export function SessionChangedFiles(props: { session: SessionModel }) {
     <Show when={files().length > 0}>
       <div
         data-component="session-changed-files"
-        class="mx-3 mt-3 shrink-0 overflow-hidden rounded-[8px] bg-v2-background-bg-layer-01"
+        class="mb-2 shrink-0 overflow-hidden rounded-[8px] bg-v2-background-bg-layer-01"
       >
         <button
           type="button"
