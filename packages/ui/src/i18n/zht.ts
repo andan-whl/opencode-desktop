@@ -128,6 +128,7 @@ export const dict = {
   "ui.promptInput.placeholder.normal": "想問什麼都可以， {{slash}} 可使用命令， {{at}} 可加入上下文…",
   "ui.promptInput.add": "新增圖片和檔案",
   "ui.promptInput.attachments": "圖片和檔案",
+  "ui.promptInput.directory": "資料夾",
   "ui.promptInput.context": "上下文",
   "ui.promptInput.shell": "shell 命令",
   "ui.promptInput.chooseAgent": "選擇代理程式",

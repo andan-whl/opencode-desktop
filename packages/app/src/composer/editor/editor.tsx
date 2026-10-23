@@ -19,6 +19,7 @@ import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { createAnimatedPresence } from "@/runtime/animated-presence"
 import { resolveBlobUrl } from "@/runtime/persistence/drafts"
+import { usePlatform } from "@/runtime/platform/platform"
 import { ProviderModelIcon } from "@/providers/models/provider-group"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { Button } from "@opencode/ui/button"
@@ -93,6 +94,7 @@ export type ComposerEditorProps = {
 
 export function ComposerEditor(props: ComposerEditorProps) {
   const i18n = useI18n()
+  const platform = usePlatform()
   const state = props.controller.state
   const view = props.controller.view
   let editor: HTMLDivElement | undefined
@@ -322,6 +324,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
               keybind={props.attachKeybind ?? ["Mod", "U"]}
               attachLabel={i18n.t("ui.promptInput.attachments")}
               attachShortcut={props.attachShortcut ?? "Mod+U"}
+              directoryLabel={platform.platform === "desktop" ? i18n.t("ui.promptInput.directory") : undefined}
+              onAttachDirectory={platform.platform === "desktop" ? props.controller.attachDirectory : undefined}
               commandsLabel={i18n.t("ui.promptInput.commands")}
               contextLabel={i18n.t("ui.promptInput.context")}
               shellLabel={i18n.t("ui.promptInput.shell")}
@@ -758,10 +762,13 @@ export function ComposerEditorAddMenu(props: {
   keybind?: string[]
   attachLabel: string
   attachShortcut?: string
+  /** Set together with onAttachDirectory to offer a native directory picker entry. */
+  directoryLabel?: string
   commandsLabel: string
   contextLabel: string
   shellLabel: string
   onAttach: () => void
+  onAttachDirectory?: () => void
   onCommands: () => void
   onContext: () => void
   onShell: () => void
@@ -795,6 +802,9 @@ export function ComposerEditorAddMenu(props: {
             <Menu.Item onSelect={props.onAttach} shortcut={props.attachShortcut}>
               {props.attachLabel}
             </Menu.Item>
+            <Show when={props.directoryLabel && props.onAttachDirectory}>
+              <Menu.Item onSelect={() => props.onAttachDirectory?.()}>{props.directoryLabel}</Menu.Item>
+            </Show>
             <Menu.Separator />
             <Menu.Item onSelect={props.onCommands} shortcut="/">
               {props.commandsLabel}

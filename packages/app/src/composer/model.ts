@@ -365,6 +365,8 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     },
     attachments: {
       picker: platform.openAttachmentPickerDialog,
+      directoryPicker:
+        platform.platform === "desktop" ? (options) => platform.openDirectoryPickerDialog(options) : undefined,
       directory: () => sdk().directory,
       destination: useAttachmentDestination(adapter.controls),
       isDialogActive: () => !!dialog.active,

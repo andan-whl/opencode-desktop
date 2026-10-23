@@ -35,6 +35,7 @@ export type ComposerEditorView = {
   placeholder?: Accessor<string>
   add?: {
     onAttach: () => void
+    onAttachDirectory?: () => void
   }
   agent?: ComposerSelectControl
   variant?: ComposerSelectControl
@@ -118,6 +119,28 @@ export function createComposerEditor(input: {
       () => restoreFocus(),
     )
   }
+
+  const attachDirectory = () => {
+    if (!attachments) {
+      input.view.add?.onAttachDirectory?.()
+
+      return
+    }
+
+    attachments.pickDirectory(() => restoreFocus())
+  }
+
+  /** Inserts an @-mention reference for a path, as the tree and directory picker do. */
+  const attachPath = (path: string, options?: { mime?: string; filename?: string }) =>
+    addPart({
+      type: "file",
+      path,
+      content: `@${path}`,
+      start: 0,
+      end: 0,
+      mime: options?.mime,
+      filename: options?.filename,
+    })
 
   const contextList = useFilteredList<ComposerSuggestion>({
     items: async (query) => {
@@ -535,6 +558,8 @@ export function createComposerEditor(input: {
       }
     },
     attach,
+    attachDirectory,
+    attachPath,
     setFileInput(element: HTMLInputElement) {
       fileInput = element
     },

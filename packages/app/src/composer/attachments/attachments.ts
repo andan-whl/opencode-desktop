@@ -1,6 +1,7 @@
 import { onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import { makeEventListener } from "@solid-primitives/event-listener"
+import { getFilename } from "@opencode/util/path"
 import { createBlobReference } from "@/runtime/persistence/drafts"
 import { uuid } from "@/runtime/persistence/uuid"
 import type { ComposerPrompt } from "../types"
@@ -19,6 +20,8 @@ export type ComposerAttachmentConfig = {
     options: { defaultPath?: string; multiple?: boolean; accept?: string[] },
     onFile: (file: File) => Promise<unknown>,
   ) => Promise<void>
+  /** Desktop-only native directory picker; directory references mention the picked paths. */
+  directoryPicker?: (options: { multiple?: boolean }) => Promise<string | string[] | null>
   directory: () => string
   destination: () => AttachmentDestination
   isDialogActive: () => boolean
@@ -256,6 +259,34 @@ export function createComposerAttachments(
 
       void input
         .picker({ defaultPath: input.directory(), multiple: true }, (file) => add(file))
+        .then(done)
+        .catch(input.onError)
+    },
+    /** Directory references mention the picked paths like @-mentions do, so several can ride one prompt. */
+    pickDirectory(done: () => void) {
+      if (!input.directoryPicker) return
+
+      void input
+        .directoryPicker({ multiple: true })
+        .then((result) => {
+          const root = input.directory().replace(/[\\/]+$/, "") + "/"
+
+          for (const path of Array.isArray(result) ? result : result ? [result] : []) {
+            const display = path.replaceAll("\\", "/").startsWith(root)
+              ? path.replaceAll("\\", "/").slice(root.length)
+              : path
+
+            input.addPart({
+              type: "file",
+              path,
+              content: `@${display}`,
+              start: 0,
+              end: 0,
+              mime: "application/x-directory",
+              filename: getFilename(path) || display,
+            })
+          }
+        })
         .then(done)
         .catch(input.onError)
     },
