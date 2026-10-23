@@ -14,9 +14,7 @@ import { createStore } from "solid-js/store"
 import { Dynamic } from "solid-js/web"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import type { FileSearchHandle } from "@opencode/session-ui/file"
-import { resolveFileDiff } from "@opencode/session-ui/session-diff"
-import { DiffChanges } from "@opencode/ui/diff-changes"
-import { SegmentedControl, SegmentedControlItem } from "@opencode/ui/segmented-control"
+import { resolveWholeFileDiff } from "@opencode/session-ui/session-diff"
 import { useFileComponent } from "@opencode/ui/context/file"
 import { cloneSelectedLineRange, previewSelectedLines } from "@opencode/session-ui/pierre/selection-bridge"
 import { createLineCommentControllerV2 } from "@opencode/session-ui/v2/line-comment-annotations-v2"
@@ -293,14 +291,12 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
     if (!diff) return undefined
 
     try {
-      return resolveFileDiff({ file: diff.file, patch: diff.patch })
+      // The whole file shows with its changes highlighted in place, as Gerrit's file view does.
+      return resolveWholeFileDiff({ file: diff.file, patch: diff.patch })
     } catch {
       return undefined
     }
   })
-
-  // A changed file shows its changes until the toggle returns to the editable file.
-  const [changesMode, setChangesMode] = createSignal(true)
 
   const scrollSync = createScrollSync({
     get: () => layout.scroll.get(props.session, key()),
@@ -456,9 +452,6 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
 
   createKeyed(moved, () => commentsUi.note.reset())
 
-  // Another file starts in its changes view again.
-  createKeyed(moved, () => setChangesMode(true))
-
   // A comment focused elsewhere, e.g. from its composer chip, opens here once this file shows.
   createKeyed(
     () => {
@@ -568,7 +561,7 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
     </ScrollView>
   )
 
-  // A changed file's diff view, the same presentation the timeline's edit tool expands to.
+  // A changed file shows its whole content with the changes highlighted in place, as Gerrit's file view does.
   const changesView = (
     <ScrollView class="min-h-0 flex-1" viewportRef={scrollSync.setViewport} onScroll={scrollSync.handleScroll}>
       <div class="relative overflow-hidden pb-40">
@@ -585,69 +578,49 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
 
   return (
     <div class="mt-3 relative h-full min-h-0 flex flex-col">
-      <Show when={changed()} keyed>
-        {(diff) => (
-          <div class="flex h-9 shrink-0 items-center gap-3 px-4">
-            <SegmentedControl
-              value={changesMode() ? "changes" : "file"}
-              onChange={(value) => setChangesMode(value === "changes")}
-            >
-              <SegmentedControlItem value="changes">{ctx.t("view.changes")}</SegmentedControlItem>
-              <SegmentedControlItem value="file">{ctx.t("view.file")}</SegmentedControlItem>
-            </SegmentedControl>
-            <DiffChanges appearance="standard" changes={diff} />
-          </div>
-        )}
-      </Show>
       <Switch>
+        {/* A file the session changed shows its whole file diff, even when the file itself no longer loads
+            (e.g. the task deleted it); the patch carries both sides of the content. */}
+        <Match when={changedDiff()}>{changesView}</Match>
         <Match when={current()?.loaded ? current()?.content : undefined}>
           {(value) => (
             <Show
-              when={changesMode() && changedDiff()}
+              when={artifact()}
               fallback={
+                // A text file edits unless it is too large to keep an editable document responsive.
                 <Show
-                  when={artifact()}
+                  when={value().content.length <= MAX_EDIT_CHARS ? path() : undefined}
+                  keyed
                   fallback={
-                    // A text file edits unless it is too large to keep an editable document responsive.
-                    <Show
-                      when={value().content.length <= MAX_EDIT_CHARS ? path() : undefined}
-                      keyed
-                      fallback={
-                        <>
-                          <Show when={value().content.length > MAX_EDIT_CHARS}>
-                            <div class="px-6 pb-2 pt-3 text-12-regular text-text-weak">
-                              {ctx.t("editor.tooLarge")}
-                            </div>
-                          </Show>
-                          {codeView(value().content)}
-                        </>
-                      }
-                    >
-                      {(editPath) => (
-                        <Suspense fallback={<div class="min-h-0 flex-1" />}>
-                          <FileEditor
-                            session={props.session}
-                            screen={props.screen}
-                            path={editPath}
-                            content={value().content}
-                            search={search}
-                          />
-                        </Suspense>
-                      )}
-                    </Show>
+                    <>
+                      <Show when={value().content.length > MAX_EDIT_CHARS}>
+                        <div class="px-6 pb-2 pt-3 text-12-regular text-text-weak">{ctx.t("editor.tooLarge")}</div>
+                      </Show>
+                      {codeView(value().content)}
+                    </>
                   }
                 >
-                  <ArtifactView
-                    session={props.session}
-                    path={path() ?? ""}
-                    content={value()}
-                    cacheKey={cacheKey()}
-                    source={codeView(value().content)}
-                  />
+                  {(editPath) => (
+                    <Suspense fallback={<div class="min-h-0 flex-1" />}>
+                      <FileEditor
+                        session={props.session}
+                        screen={props.screen}
+                        path={editPath}
+                        content={value().content}
+                        search={search}
+                      />
+                    </Suspense>
+                  )}
                 </Show>
               }
             >
-              {changesView}
+              <ArtifactView
+                session={props.session}
+                path={path() ?? ""}
+                content={value()}
+                cacheKey={cacheKey()}
+                source={codeView(value().content)}
+              />
             </Show>
           )}
         </Match>

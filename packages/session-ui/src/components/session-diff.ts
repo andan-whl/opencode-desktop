@@ -37,6 +37,37 @@ export function resolveFileDiff(diff: DiffSource) {
   return fileDiffFromContent(diff.file, diff.before ?? "", diff.after ?? "")
 }
 
+/**
+ * The diff of a complete patch with its single full-context hunk kept unsplit: the whole file shows as one hunk,
+ * its changed lines highlighted in place, as Gerrit's file view does. A partial patch falls back to the collapsed
+ * hunks of `resolveFileDiff`.
+ */
+export function resolveWholeFileDiff(diff: DiffSource) {
+  if (diff.patch == null) return resolveFileDiff(diff)
+
+  const key = `${diff.file}\0${diff.patch}`
+  const complete = completePatch(diff.patch)
+
+  if (!complete) return fileDiffFromPatch(diff.file, diff.patch)
+
+  // "\\" marker lines annotate the line before them; every other line counts toward one side.
+  const oldCount = complete.lines.filter((line) => !line.startsWith("+") && !line.startsWith("\\")).length
+  const newCount = complete.lines.filter((line) => !line.startsWith("-") && !line.startsWith("\\")).length
+  const hunk = `@@ -${oldCount === 0 ? 0 : 1},${oldCount} +${newCount === 0 ? 0 : 1},${newCount} @@\n${complete.lines.join("\n")}`
+
+  const value =
+    processFile(`--- a\n+++ a\n${hunk}`, {
+      isGitDiff: false,
+      oldFile: { name: diff.file, contents: complete.before },
+      newFile: { name: diff.file, contents: complete.after },
+    }) ?? emptyFileDiff(diff.file)
+
+  value.name = diff.file
+  value.cacheKey = highlightKey(`${key}\0whole`)
+
+  return value
+}
+
 export function normalize(diff: ReviewDiff): ViewDiff {
   return {
     file: diff.file,

@@ -3,8 +3,6 @@ export default {
   "tree.empty": "无文件",
   "view.explorer": "资源管理器",
   "view.scm": "源代码管理",
-  "view.changes": "变更",
-  "view.file": "文件",
   "project.openDirectory": "打开项目目录",
   "tree.changes.empty": "暂无更改",
   "tree.changes.one": "{{count}} 个文件已更改",
