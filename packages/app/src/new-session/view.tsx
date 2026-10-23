@@ -1,12 +1,16 @@
 import { useDialog } from "@opencode/ui/context/dialog"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { Icon } from "@opencode/ui/icon"
+import { IconButton } from "@opencode/ui/icon-button"
 import { Show, createMemo, createSignal } from "solid-js"
+import { createMediaQuery } from "@solid-primitives/media"
 import { Schema } from "effect"
 import createPresence from "solid-presence"
 import { Composer } from "@/composer/composer"
 import { ComposerDropzone } from "@/composer/dropzone"
 import type { ComposerModel } from "@/composer/model"
+import { useLayout } from "@/shell/state/layout"
+import { NewSessionFileTree } from "@/new-session/file-tree"
 import { PromptGitStatus, PromptWorkspaceSelector } from "@/new-session/workspace/selector"
 import {
   PromptProjectAddButton,
@@ -39,6 +43,9 @@ export function NewSessionView(props: {
   project: PromptProjectController
   workspace: NewSessionWorkspaceController
 }) {
+  const layout = useLayout()
+  const language = useLanguage()
+  const desktop = createMediaQuery("(min-width: 768px)")
   const [onboarding, setOnboarding, , onboardingReady] = persisted(
     Persist.global("workspace-onboarding"),
     WorkspaceOnboardingSchema,
@@ -51,12 +58,50 @@ export function NewSessionView(props: {
     if (value !== "main") setOnboarding("used", true)
   }
 
+  const treeOpened = () => desktop() && layout.fileTree.opened()
+  const treeWidth = createMemo(() => Math.min(480, Math.max(240, layout.fileTree.width())))
+
+  const pickFile = (path: string) => {
+    props.composer.attachPath(path)
+    props.composer.restoreFocus()
+  }
+
   return (
-    <div class="@container relative flex flex-col min-h-0 h-full flex-1">
+    <div class="@container relative flex min-h-0 h-full flex-1 flex-row gap-2">
+      <Show when={treeOpened()}>
+        <div
+          data-component="new-session-tree"
+          class="relative flex h-full min-w-0 shrink-0 flex-col overflow-hidden rounded-[10px] bg-v2-background-bg-base shadow-[var(--v2-elevation-raised)]"
+          style={{ width: `${treeWidth()}px` }}
+        >
+          <div class="flex h-10 shrink-0 items-center px-4 text-[11px] font-medium uppercase tracking-wide text-v2-text-text-faint">
+            {language.t("activity.explorer")}
+          </div>
+          <div class="min-h-0 flex-1">
+            <NewSessionFileTree onPick={pickFile} />
+          </div>
+        </div>
+      </Show>
       <div
         data-component="new-session"
-        class="relative flex-1 min-h-0 overflow-hidden rounded-[10px] bg-v2-background-bg-base shadow-[var(--v2-elevation-raised)]"
+        class="relative min-w-0 flex-1 overflow-hidden rounded-[10px] bg-v2-background-bg-base shadow-[var(--v2-elevation-raised)]"
       >
+        <Show when={desktop()}>
+          <div class="absolute end-3 top-0 z-30 flex items-center h-12" data-slot="new-session-tree-toggle">
+            <Tooltip placement="bottom" value={language.t("command.fileTree.toggle")}>
+              <IconButton
+                type="button"
+                variant="ghost-muted"
+                size="large"
+                state={layout.fileTree.opened() ? "pressed" : undefined}
+                onClick={() => layout.fileTree.toggle()}
+                aria-label={language.t("command.fileTree.toggle")}
+                aria-expanded={layout.fileTree.opened()}
+                icon={<Icon name="sidebar-right" />}
+              />
+            </Tooltip>
+          </div>
+        </Show>
         <ComposerDropzone
           active={props.composer.state.drag === "active"}
           input={props.composer.model.selection.current()?.capabilities.input}

@@ -1,6 +1,7 @@
 import { useDialog } from "@opencode/ui/context/dialog"
 import { useSettingsCommand } from "@/settings/command"
 import { useCommand } from "@/shell/commands/command"
+import { useLayout } from "@/shell/state/layout"
 import { useLanguage } from "@/runtime/i18n/language"
 
 export function useNewSessionCommands(input: {
@@ -17,6 +18,7 @@ export function useNewSessionCommands(input: {
   const command = useCommand()
   const dialog = useDialog()
   const language = useLanguage()
+  const layout = useLayout()
 
   useSettingsCommand()
   command.register("new-session", () => [
@@ -28,6 +30,13 @@ export function useNewSessionCommands(input: {
         const { DialogCommandPalette } = await import("@/shell/commands/dialog")
         void dialog.show(() => <DialogCommandPalette />)
       },
+    },
+    {
+      id: "fileTree.toggle",
+      title: language.t("command.fileTree.toggle"),
+      category: language.t("command.category.view"),
+      keybind: "mod+\\",
+      onSelect: () => layout.fileTree.toggle(),
     },
     {
       id: "input.focus",
