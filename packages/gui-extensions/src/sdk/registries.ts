@@ -485,6 +485,11 @@ export interface Link {
    * where they stay (e.g. a palette pick or a composer chip). Handlers pass it to `Layout.open`.
    */
   readonly background?: boolean
+  /**
+   * Also reveal the file in the sidebar's tree: switch to the explorer view, expand its ancestor directories, and
+   * scroll its row into view.
+   */
+  readonly revealTree?: boolean
   /** Workspace-relative directory the link was written in. */
   readonly base?: string
   /** The session the link belongs to. */

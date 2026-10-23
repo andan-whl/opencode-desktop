@@ -39,6 +39,7 @@ import { SessionReviewToggle } from "./header/session-header-actions"
 import { SessionRunningMenu } from "./header/session-running-menu"
 import { createAnimatedPresence } from "@/runtime/animated-presence"
 import { createTimelineCache } from "./timeline/cache"
+import { SessionChangedFiles } from "./changed-files"
 
 export function SessionScreenView(props: { session: SessionModel }) {
   // The timeline cache captures its owner when created, so link handling must be provided above it.
@@ -283,6 +284,9 @@ function SessionScreenContent(props: {
         {(error) => {
           throw error()
         }}
+      </Show>
+      <Show when={isDesktop() && !!session.identity.params.id}>
+        <SessionChangedFiles session={session} />
       </Show>
       <div class="relative flex-1 min-h-0 overflow-hidden">
         <Show when={!isDesktop() && store.mobileDockCached}>

@@ -151,6 +151,47 @@ const setup: Setup<typeof File> = (ctx) => {
     void screen.file.sync(path)
   }
 
+  /**
+   * Reveals a workspace file in the sidebar's tree: the explorer view shows, every ancestor directory expands, and
+   * the row scrolls into view once the tree has loaded it. Expansion loads asynchronously, so the row is polled for.
+   */
+  const revealInTree = (screen: SessionScreen, path: string) => {
+    const file = screen.file
+    const normalized = file
+      .resolve(path)
+      ?.replace(/[\\/]+$/, "")
+      .replaceAll("\\", "/")
+
+    if (!normalized) return
+
+    file.view.open("explorer")
+
+    const parts = normalized.split("/")
+
+    parts
+      .slice(0, -1)
+      .map((_, index) => parts.slice(0, index + 1).join("/"))
+      .forEach((dir) => file.tree.expand(dir))
+
+    const deadline = Date.now() + 2000
+
+    const tick = () => {
+      const node = document.querySelector<HTMLElement>(
+        `[data-scope="filetree"] [data-path="${CSS.escape(normalized)}"]`,
+      )
+
+      if (node) {
+        node.scrollIntoView({ block: "center" })
+
+        return
+      }
+
+      if (Date.now() < deadline) setTimeout(tick, 60)
+    }
+
+    tick()
+  }
+
   const applySelection = (session: MountedSession, files: Files, path: string, selection: LineRange | undefined) => {
     if (!selection || artifactKind(path) !== "text") return
 
@@ -633,6 +674,7 @@ const setup: Setup<typeof File> = (ctx) => {
         batch(() => {
           open(session, path, { background: link.background })
           shared.tree.setTab("all")
+          if (link.revealTree) revealInTree(screen, path)
         })
 
         return

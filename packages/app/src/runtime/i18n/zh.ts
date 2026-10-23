@@ -413,6 +413,7 @@ export const dict = {
   "home.providerTip": "连接 75 个以上的提供商，使用包括 Claude、GPT、Gemini 在内的更多模型",
 
   "session.tab.session": "会话",
+  "session.changedFiles.title": "改动的文件",
   "session.tab.unknown": "未知会话",
   "session.panel.reviewAndFiles": "审查和文件",
   "session.error.notFound": "找不到此会话",
