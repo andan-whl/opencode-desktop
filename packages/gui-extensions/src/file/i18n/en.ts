@@ -31,6 +31,8 @@ export default {
   "mobile.openTabs": "Open files",
   "view.preview": "Preview",
   "view.source": "Source",
+  "view.changes": "Changes",
+  "view.file": "File",
   "view.openInBrowser": "Open in browser",
   "view.fullscreen": "Enter full screen",
   "view.exitFullscreen": "Exit full screen",

@@ -1,8 +1,22 @@
-import { createMemo, createSignal, lazy, Match, on, onCleanup, Show, Suspense, Switch } from "solid-js"
+import {
+  createMemo,
+  createResource,
+  createSignal,
+  lazy,
+  Match,
+  on,
+  onCleanup,
+  Show,
+  Suspense,
+  Switch,
+} from "solid-js"
 import { createStore } from "solid-js/store"
 import { Dynamic } from "solid-js/web"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import type { FileSearchHandle } from "@opencode/session-ui/file"
+import { resolveFileDiff } from "@opencode/session-ui/session-diff"
+import { DiffChanges } from "@opencode/ui/diff-changes"
+import { SegmentedControl, SegmentedControlItem } from "@opencode/ui/segmented-control"
 import { useFileComponent } from "@opencode/ui/context/file"
 import { cloneSelectedLineRange, previewSelectedLines } from "@opencode/session-ui/pierre/selection-bridge"
 import { createLineCommentControllerV2 } from "@opencode/session-ui/v2/line-comment-annotations-v2"
@@ -243,6 +257,51 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
     return shared.handoff.get(props.session.key, p) ?? null
   })
 
+  // The session's own changes: a file the task changed shows them first, as the timeline's edit does.
+  const [sessionDiffs, { refetch: refetchSessionDiffs }] = createResource(
+    () => props.session.id,
+    async (id) => {
+      const result = await props.session.server.client.session.diff({ sessionID: id }).catch(() => undefined)
+
+      return result ?? []
+    },
+  )
+
+  // A session that goes idle finished its turn, which may have changed files.
+  const idled = createMemo(
+    on(
+      () => props.session.server.data.session.status(props.session.id),
+      (next, previous) => (next === "idle" && previous !== undefined && previous !== "idle" ? {} : undefined),
+      { defer: true },
+    ),
+  )
+
+  createKeyed(idled, () => void refetchSessionDiffs())
+
+  const changed = createMemo(() => {
+    const p = path()
+
+    if (!p) return undefined
+
+    // A diff without a patch, e.g. a binary file, has no change points to show.
+    return (sessionDiffs() ?? []).find((diff) => diff.patch && file.resolve(diff.file) === p)
+  })
+
+  const changedDiff = createMemo(() => {
+    const diff = changed()
+
+    if (!diff) return undefined
+
+    try {
+      return resolveFileDiff({ file: diff.file, patch: diff.patch })
+    } catch {
+      return undefined
+    }
+  })
+
+  // A changed file shows its changes until the toggle returns to the editable file.
+  const [changesMode, setChangesMode] = createSignal(true)
+
   const scrollSync = createScrollSync({
     get: () => layout.scroll.get(props.session, key()),
     set: (pos) => layout.scroll.set(props.session, key(), pos),
@@ -397,6 +456,9 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
 
   createKeyed(moved, () => commentsUi.note.reset())
 
+  // Another file starts in its changes view again.
+  createKeyed(moved, () => setChangesMode(true))
+
   // A comment focused elsewhere, e.g. from its composer chip, opens here once this file shows.
   createKeyed(
     () => {
@@ -506,48 +568,86 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
     </ScrollView>
   )
 
+  // A changed file's diff view, the same presentation the timeline's edit tool expands to.
+  const changesView = (
+    <ScrollView class="min-h-0 flex-1" viewportRef={scrollSync.setViewport} onScroll={scrollSync.handleScroll}>
+      <div class="relative overflow-hidden pb-40">
+        <Dynamic
+          component={fileComponent}
+          mode="diff"
+          fileDiff={changedDiff()}
+          hunkSeparators={changedDiff()?.isPartial ? "simple" : "line-info-basic"}
+          class="select-text"
+        />
+      </div>
+    </ScrollView>
+  )
+
   return (
     <div class="mt-3 relative h-full min-h-0 flex flex-col">
+      <Show when={changed()} keyed>
+        {(diff) => (
+          <div class="flex h-9 shrink-0 items-center gap-3 px-4">
+            <SegmentedControl
+              value={changesMode() ? "changes" : "file"}
+              onChange={(value) => setChangesMode(value === "changes")}
+            >
+              <SegmentedControlItem value="changes">{ctx.t("view.changes")}</SegmentedControlItem>
+              <SegmentedControlItem value="file">{ctx.t("view.file")}</SegmentedControlItem>
+            </SegmentedControl>
+            <DiffChanges appearance="standard" changes={diff} />
+          </div>
+        )}
+      </Show>
       <Switch>
         <Match when={current()?.loaded ? current()?.content : undefined}>
           {(value) => (
             <Show
-              when={artifact()}
+              when={changesMode() && changedDiff()}
               fallback={
-                // A text file edits unless it is too large to keep an editable document responsive.
                 <Show
-                  when={value().content.length <= MAX_EDIT_CHARS ? path() : undefined}
-                  keyed
+                  when={artifact()}
                   fallback={
-                    <>
-                      <Show when={value().content.length > MAX_EDIT_CHARS}>
-                        <div class="px-6 pb-2 pt-3 text-12-regular text-text-weak">{ctx.t("editor.tooLarge")}</div>
-                      </Show>
-                      {codeView(value().content)}
-                    </>
+                    // A text file edits unless it is too large to keep an editable document responsive.
+                    <Show
+                      when={value().content.length <= MAX_EDIT_CHARS ? path() : undefined}
+                      keyed
+                      fallback={
+                        <>
+                          <Show when={value().content.length > MAX_EDIT_CHARS}>
+                            <div class="px-6 pb-2 pt-3 text-12-regular text-text-weak">
+                              {ctx.t("editor.tooLarge")}
+                            </div>
+                          </Show>
+                          {codeView(value().content)}
+                        </>
+                      }
+                    >
+                      {(editPath) => (
+                        <Suspense fallback={<div class="min-h-0 flex-1" />}>
+                          <FileEditor
+                            session={props.session}
+                            screen={props.screen}
+                            path={editPath}
+                            content={value().content}
+                            search={search}
+                          />
+                        </Suspense>
+                      )}
+                    </Show>
                   }
                 >
-                  {(editPath) => (
-                    <Suspense fallback={<div class="min-h-0 flex-1" />}>
-                      <FileEditor
-                        session={props.session}
-                        screen={props.screen}
-                        path={editPath}
-                        content={value().content}
-                        search={search}
-                      />
-                    </Suspense>
-                  )}
+                  <ArtifactView
+                    session={props.session}
+                    path={path() ?? ""}
+                    content={value()}
+                    cacheKey={cacheKey()}
+                    source={codeView(value().content)}
+                  />
                 </Show>
               }
             >
-              <ArtifactView
-                session={props.session}
-                path={path() ?? ""}
-                content={value()}
-                cacheKey={cacheKey()}
-                source={codeView(value().content)}
-              />
+              {changesView}
             </Show>
           )}
         </Match>
