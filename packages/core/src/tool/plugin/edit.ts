@@ -199,6 +199,21 @@ const countBefore = (positions: number[], offset: number) => {
   return low
 }
 
+/** Matches the "N: " line prefix Read puts in front of every text line. */
+const readLinePrefix = /^[0-9]+:\s/
+
+/**
+ * Read prefixes every line with "N: ", and a model that copies that prefix into its strings can never match
+ * the file. When every non-empty line carries the prefix, return the value with the prefixes removed;
+ * otherwise return undefined. Files whose lines genuinely start with "N: " are unaffected because the
+ * original strings still run through every tier first and the stripped pair is only a fallback.
+ */
+const stripReadLineNumbers = (value: string) => {
+  const lines = value.split("\n")
+  if (!lines.every((line) => line === "" || readLinePrefix.test(line))) return
+  return lines.map((line) => line.replace(readLinePrefix, "")).join("\n")
+}
+
 /** Deferred edit behavior and UX integrations remain visible at the model-facing seam. */
 // TODO: Publish watcher/file-edit events after watcher integration exists.
 // TODO: Add snapshots / undo after design exists.
@@ -232,7 +247,8 @@ export const Plugin = {
               }
               if (input.oldString === input.newString) {
                 return yield* new ToolFailure({
-                  message: "No changes to apply: oldString and newString are identical.",
+                  message:
+                    "No changes to apply: oldString and newString are identical. If the intended change is already in the file, read the file to confirm; otherwise put the surrounding context in oldString and the same context with your change in newString.",
                 })
               }
               if (input.oldString === "") {
@@ -257,10 +273,21 @@ export const Plugin = {
               const source = original.text
               // Strings that differ only in \r ask to change line endings themselves, so they apply to the exact
               // bytes. Every other edit matches the LF view Read shows the model and keeps the file's endings.
-              const endingsOnly = input.oldString.replaceAll("\r", "") === input.newString.replaceAll("\r", "")
-              const { matches, replace } = endingsOnly
-                ? { matches: findOccurrences(source, input.oldString), replace: () => input.newString }
-                : matchView(source, input.oldString, input.newString)
+              const attempt = (oldString: string, newString: string) => {
+                const endingsOnly = oldString.replaceAll("\r", "") === newString.replaceAll("\r", "")
+                return {
+                  endingsOnly,
+                  ...(endingsOnly
+                    ? { matches: findOccurrences(source, oldString), replace: () => newString }
+                    : matchView(source, oldString, newString)),
+                }
+              }
+              let { matches, replace, endingsOnly } = attempt(input.oldString, input.newString)
+              // Read prefixes every text line with "N: "; when the model copied those prefixes along, retry
+              // without them. newString keeps its own prefixes unless every one of its lines carries them too.
+              const unprefixedOld = stripReadLineNumbers(input.oldString)
+              if (matches.length === 0 && unprefixedOld !== undefined && unprefixedOld !== "" && unprefixedOld !== input.oldString)
+                ({ matches, replace, endingsOnly } = attempt(unprefixedOld, stripReadLineNumbers(input.newString) ?? input.newString))
               const replacements = matches.length
               const replaced = (input.replaceAll === true ? matches : matches.slice(0, 1))
                 .toReversed()
@@ -282,8 +309,14 @@ export const Plugin = {
                 source: permissionSource,
               })
               if (replacements === 0) {
+                // A first line that carries Read's prefix while not every line does keeps the strip fallback
+                // from applying, so point the model at the prefix it left in.
+                const hint =
+                  unprefixedOld === undefined && readLinePrefix.test(input.oldString)
+                    ? " Hint: remove the 'N: ' line-number prefixes that Read adds; they are not part of the file."
+                    : ""
                 return yield* new ToolFailure({
-                  message: `Could not find oldString in ${input.path}. It must match exactly, including whitespace and indentation.`,
+                  message: `Could not find oldString in ${input.path}. It must match exactly, including whitespace and indentation.${hint}`,
                 })
               }
               if (replacements > 1 && input.replaceAll !== true) {

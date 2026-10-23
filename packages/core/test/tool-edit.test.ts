@@ -390,7 +390,8 @@ describe("EditTool", () => {
                 status: "error",
                 error: {
                   type: "tool.execution",
-                  message: "No changes to apply: oldString and newString are identical.",
+                  message:
+                    "No changes to apply: oldString and newString are identical. If the intended change is already in the file, read the file to confirm; otherwise put the surrounding context in oldString and the same context with your change in newString.",
                 },
               })
               expect(
@@ -739,6 +740,89 @@ describe("EditTool", () => {
             }),
           ),
         ),
+      )
+    }),
+  )
+
+  it.live("retries without Read line-number prefixes the model copied along", () =>
+    withTempDir((tmp) => {
+      const edit = makeEditFixture()
+      const target = path.join(tmp.path, "orchestrator.py")
+      return Effect.promise(() => fs.writeFile(target, "def foo():\n    return 1\n")).pipe(
+        Effect.andThen(
+          withTool(tmp.path, edit, (registry) =>
+            Effect.gen(function* () {
+              // Prefixes on both strings: strip both.
+              const both = yield* executeTool(
+                registry,
+                call({
+                  path: "orchestrator.py",
+                  oldString: "1: def foo():\n2:     return 1",
+                  newString: "1: def bar():\n2:     return 1",
+                }),
+              )
+              expect(both).toMatchObject({ status: "completed", output: { replacements: 1 } })
+              expect(yield* Effect.promise(() => fs.readFile(target, "utf8"))).toBe("def bar():\n    return 1\n")
+
+              // Prefixes only on oldString: strip old, keep new verbatim.
+              const oldOnly = yield* executeTool(
+                registry,
+                call({ path: "orchestrator.py", oldString: "2:     return 1", newString: "    return 2" }),
+              )
+              expect(oldOnly).toMatchObject({ status: "completed", output: { replacements: 1 } })
+              expect(yield* Effect.promise(() => fs.readFile(target, "utf8"))).toBe("def bar():\n    return 2\n")
+              expect(edit.writes).toHaveLength(2)
+            }),
+          ),
+        ),
+      )
+    }),
+  )
+
+  it.live("edits files whose lines genuinely start with N: without stripping them", () =>
+    withTempDir((tmp) => {
+      const edit = makeEditFixture()
+      const target = path.join(tmp.path, "numbered.txt")
+      return Effect.promise(() => fs.writeFile(target, "1: one\n2: two\n")).pipe(
+        Effect.andThen(
+          withTool(tmp.path, edit, (registry) =>
+            executeTool(registry, call({ path: "numbered.txt", oldString: "1: one", newString: "1: UNO" })),
+          ),
+        ),
+        Effect.andThen((settled) =>
+          Effect.gen(function* () {
+            expect(settled).toMatchObject({ status: "completed", output: { replacements: 1 } })
+            expect(yield* Effect.promise(() => fs.readFile(target, "utf8"))).toBe("1: UNO\n2: two\n")
+          }),
+        ),
+      )
+    }),
+  )
+
+  it.live("hints at leftover line-number prefixes when only some lines carry them", () =>
+    withTempDir((tmp) => {
+      const edit = makeEditFixture()
+      const target = path.join(tmp.path, "partial.txt")
+      return Effect.promise(() => fs.writeFile(target, "alpha\nbeta\n")).pipe(
+        Effect.andThen(
+          withTool(tmp.path, edit, (registry) =>
+            executeTool(registry, call({ path: "partial.txt", oldString: "1: alpha\nbeta", newString: "changed" })),
+          ),
+        ),
+        Effect.tap((result) =>
+          Effect.sync(() =>
+            expect(result).toEqual({
+              status: "error",
+              error: {
+                type: "tool.execution",
+                message:
+                  "Could not find oldString in partial.txt. It must match exactly, including whitespace and indentation. Hint: remove the 'N: ' line-number prefixes that Read adds; they are not part of the file.",
+              },
+            }),
+          ),
+        ),
+        Effect.andThen(() => Effect.promise(() => fs.readFile(target, "utf8"))),
+        Effect.tap((content) => Effect.sync(() => expect(content).toBe("alpha\nbeta\n"))),
       )
     }),
   )
