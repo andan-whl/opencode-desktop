@@ -1,6 +1,6 @@
 # OpenCodeDesktop
 
-**OpenCodeDesktop** 是一个个人编程助手客户端 —— 基于 [opencode](https://github.com/sst/opencode)（SST/Anomaly Innovations 出品的开源 AI Coding Agent）打造的独立客户端，主打隐私优先。客户端版本 1.0.13。
+**OpenCodeDesktop** 是一个个人编程助手客户端 —— 基于 [opencode](https://github.com/sst/opencode)（SST/Anomaly Innovations 出品的开源 AI Coding Agent）打造的独立客户端，主打隐私优先。客户端版本 1.0.14。
 
 这个 fork 完整保留了 opencode 的 agent 工程能力和桌面客户端，同时移除了所有会“打电话回家”的部分。你的 API 密钥、提示词和代码始终留在本机。
 
