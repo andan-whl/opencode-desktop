@@ -11,6 +11,10 @@ import { useServer } from "@/runtime/server/current"
 import { showToast } from "@/shell/notifications/toast"
 import type { SessionModel } from "@/session/model"
 
+// Fingerprints of change sets an apply-all or revert-all settled, keyed by session id: a settled list stays hidden
+// until a later turn changes files again. Module-level so remounts (tab switches) keep the dismissal.
+const dismissedChanges = new Map<string, string>()
+
 /**
  * The files the routed session changed, above the conversation. Clicking a row opens the file as the
  * middle column's tab and reveals it in the sidebar tree, so the workspace view follows the task.
@@ -49,6 +53,15 @@ export function SessionChangedFiles(props: { session: SessionModel }) {
     }),
   )
 
+  // Fingerprints of the change sets an apply-all or revert-all settled, keyed by session: a settled list stays
+  // hidden until a later turn changes files again (its fingerprint differs).
+  const fingerprint = () =>
+    files()
+      .map((diff) => `${diff.file}:${diff.additions}:${diff.deletions}`)
+      .join("\n")
+
+  const settled = () => dismissedChanges.get(sessionID() ?? "") === fingerprint()
+
   // While the task runs, its own writes race a revert or apply, so the buttons wait for the idle turn.
   const running = () => {
     const id = sessionID()
@@ -82,7 +95,9 @@ export function SessionChangedFiles(props: { session: SessionModel }) {
         }),
       )
 
-      void refetch()
+      const id = sessionID()
+
+      if (id) dismissedChanges.set(id, fingerprint())
     } catch (error) {
       showToast({
         variant: "error",
@@ -102,7 +117,7 @@ export function SessionChangedFiles(props: { session: SessionModel }) {
   }
 
   return (
-    <Show when={files().length > 0}>
+    <Show when={files().length > 0 && !settled()}>
       <div
         data-component="session-changed-files"
         class="mb-2 shrink-0 overflow-hidden rounded-[8px] bg-v2-background-bg-layer-01"
