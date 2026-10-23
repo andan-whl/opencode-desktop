@@ -404,6 +404,9 @@ export const dict = {
 
   "session.tab.session": "工作階段",
   "session.changedFiles.title": "變更的檔案",
+  "session.changedFiles.applyAll": "全部套用",
+  "session.changedFiles.revertAll": "全部還原",
+  "session.changedFiles.writeFailed": "更新檔案失敗",
   "session.tab.unknown": "未知的工作階段",
   "session.panel.reviewAndFiles": "檢閱與檔案",
   "session.error.notFound": "找不到此工作階段",

@@ -468,6 +468,9 @@ export const dict = {
 
   "session.tab.session": "Session",
   "session.changedFiles.title": "Changed files",
+  "session.changedFiles.applyAll": "Apply all",
+  "session.changedFiles.revertAll": "Revert all",
+  "session.changedFiles.writeFailed": "Couldn't update the files",
   "session.tab.more": "More...",
   "session.view.select": "Session view",
   "session.tab.add": "Add tab",

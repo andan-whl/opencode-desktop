@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createResource, createSignal, For, on, Show } from "solid-js"
+import { completePatchContents } from "@opencode/session-ui/session-diff"
 import { DiffChanges } from "@opencode/ui/diff-changes"
 import { FileIcon } from "@opencode/ui/file-icon"
 import { Icon } from "@opencode/ui/icon"
@@ -7,11 +8,13 @@ import { useExtensionAttachment } from "@/runtime/extension/host-apis"
 import { useExtensionHost } from "@/runtime/extension/host"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useServer } from "@/runtime/server/current"
+import { showToast } from "@/shell/notifications/toast"
 import type { SessionModel } from "@/session/model"
 
 /**
  * The files the routed session changed, above the conversation. Clicking a row opens the file as the
  * middle column's tab and reveals it in the sidebar tree, so the workspace view follows the task.
+ * Apply-all writes each change's resulting content to disk; revert-all restores the content before the task.
  */
 export function SessionChangedFiles(props: { session: SessionModel }) {
   const language = useLanguage()
@@ -20,6 +23,7 @@ export function SessionChangedFiles(props: { session: SessionModel }) {
   const extensions = useExtensionAttachment()
   const sessionID = () => props.session.identity.sessionID()
   const [expanded, setExpanded] = createSignal(true)
+  const [working, setWorking] = createSignal(false)
 
   const [diffs, { refetch }] = createResource(sessionID, async (id) => {
     if (!id) return []
@@ -45,6 +49,51 @@ export function SessionChangedFiles(props: { session: SessionModel }) {
     }),
   )
 
+  // While the task runs, its own writes race a revert or apply, so the buttons wait for the idle turn.
+  const running = () => {
+    const id = sessionID()
+
+    return !!id && server.ctx.data.session.status(id) === "running"
+  }
+
+  // Writes one side of every change's complete patch: "after" applies the task's changes to the files,
+  // "before" restores the content the task started from.
+  const writeAll = async (side: "before" | "after") => {
+    if (working() || running()) return
+    setWorking(true)
+
+    try {
+      const directory = props.session.workspace.directory()
+      const encoder = new TextEncoder()
+
+      await Promise.all(
+        files().flatMap((diff) => {
+          const contents = diff.patch ? completePatchContents(diff.patch) : undefined
+
+          if (!contents) return []
+
+          return [
+            server.ctx.sdk.api.file.write({
+              path: diff.file,
+              location: { directory },
+              payload: encoder.encode(contents[side]),
+            }),
+          ]
+        }),
+      )
+
+      void refetch()
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: language.t("session.changedFiles.writeFailed"),
+        description: error instanceof Error ? error.message : String(error),
+      })
+    } finally {
+      setWorking(false)
+    }
+  }
+
   const openFile = (path: string) => {
     const session = extensions.current()
 
@@ -58,23 +107,43 @@ export function SessionChangedFiles(props: { session: SessionModel }) {
         data-component="session-changed-files"
         class="mb-2 shrink-0 overflow-hidden rounded-[8px] bg-v2-background-bg-layer-01"
       >
-        <button
-          type="button"
-          class="flex h-8 w-full min-w-0 items-center gap-1.5 px-2 text-start text-[12px] font-medium text-v2-text-text-base transition-colors duration-100 hover:bg-v2-background-bg-layer-02 focus-visible:outline-none"
-          aria-expanded={expanded()}
-          onClick={() => setExpanded((value) => !value)}
-        >
-          <Icon
-            name={expanded() ? "chevron-down" : "chevron-right"}
-            size="small"
-            class="shrink-0 text-v2-icon-icon-muted"
-          />
-          <span class="min-w-0 flex-1 truncate">
-            {language.t("session.changedFiles.title")}
-            <span class="ms-1.5 text-v2-text-text-faint">{files().length}</span>
-          </span>
-          <DiffChanges changes={totals()} />
-        </button>
+        <div class="flex h-8 items-center">
+          <button
+            type="button"
+            class="flex h-8 min-w-0 flex-1 items-center gap-1.5 px-2 text-start text-[12px] font-medium text-v2-text-text-base transition-colors duration-100 hover:bg-v2-background-bg-layer-02 focus-visible:outline-none"
+            aria-expanded={expanded()}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            <Icon
+              name={expanded() ? "chevron-down" : "chevron-right"}
+              size="small"
+              class="shrink-0 text-v2-icon-icon-muted"
+            />
+            <span class="min-w-0 flex-1 truncate">
+              {language.t("session.changedFiles.title")}
+              <span class="ms-1.5 text-v2-text-text-faint">{files().length}</span>
+            </span>
+            <DiffChanges changes={totals()} />
+          </button>
+          <div class="flex shrink-0 items-center gap-0.5 pe-1">
+            <button
+              type="button"
+              class="rounded px-1.5 py-0.5 text-[11px] text-v2-text-text-muted transition-colors duration-100 hover:bg-v2-background-bg-layer-02 hover:text-v2-text-text-base disabled:pointer-events-none disabled:opacity-50"
+              disabled={working() || running()}
+              onClick={() => void writeAll("after")}
+            >
+              {language.t("session.changedFiles.applyAll")}
+            </button>
+            <button
+              type="button"
+              class="rounded px-1.5 py-0.5 text-[11px] text-v2-text-text-muted transition-colors duration-100 hover:bg-v2-background-bg-layer-02 hover:text-v2-text-text-base disabled:pointer-events-none disabled:opacity-50"
+              disabled={working() || running()}
+              onClick={() => void writeAll("before")}
+            >
+              {language.t("session.changedFiles.revertAll")}
+            </button>
+          </div>
+        </div>
         <Show when={expanded()}>
           <div class="max-h-52 overflow-y-auto pb-1">
             <For each={files()}>

@@ -414,6 +414,9 @@ export const dict = {
 
   "session.tab.session": "会话",
   "session.changedFiles.title": "改动的文件",
+  "session.changedFiles.applyAll": "全部应用",
+  "session.changedFiles.revertAll": "全部撤销",
+  "session.changedFiles.writeFailed": "更新文件失败",
   "session.tab.unknown": "未知会话",
   "session.panel.reviewAndFiles": "审查和文件",
   "session.error.notFound": "找不到此会话",
