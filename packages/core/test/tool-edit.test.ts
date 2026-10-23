@@ -410,7 +410,7 @@ describe("EditTool", () => {
                 error: {
                   type: "tool.execution",
                   message:
-                    "Could not find oldString in matches.txt. It must match exactly, including whitespace and indentation.",
+                    "Could not find oldString in matches.txt. It must match exactly, including whitespace and indentation. The file may have changed since it was last read, or the copied text differs in indentation (tabs vs spaces); re-read the file and retry with its current content.",
                 },
               })
               expect(
@@ -810,17 +810,17 @@ describe("EditTool", () => {
           ),
         ),
         Effect.tap((result) =>
-          Effect.sync(() =>
-            expect(result).toEqual({
-              status: "error",
-              error: {
-                type: "tool.execution",
-                message:
-                  "Could not find oldString in partial.txt. It must match exactly, including whitespace and indentation. Hint: remove the 'N: ' line-number prefixes that Read adds; they are not part of the file.",
-              },
-            }),
+            Effect.sync(() =>
+              expect(result).toEqual({
+                status: "error",
+                error: {
+                  type: "tool.execution",
+                  message:
+                    "Could not find oldString in partial.txt. It must match exactly, including whitespace and indentation. The file may have changed since it was last read, or the copied text differs in indentation (tabs vs spaces); re-read the file and retry with its current content. Hint: remove the 'N: ' line-number prefixes that Read adds; they are not part of the file.",
+                },
+              }),
+            ),
           ),
-        ),
         Effect.andThen(() => Effect.promise(() => fs.readFile(target, "utf8"))),
         Effect.tap((content) => Effect.sync(() => expect(content).toBe("alpha\nbeta\n"))),
       )
@@ -878,6 +878,102 @@ describe("EditTool", () => {
             expect(edit.writes).toEqual([target])
           }),
         ),
+      )
+    }),
+  )
+
+  it.live("re-indents a copy whose tabs became spaces and keeps the file's own indentation", () =>
+    withTempDir((tmp) => {
+      const edit = makeEditFixture()
+      const target = path.join(tmp.path, "orchestrator.py")
+      return Effect.promise(() =>
+        fs.writeFile(target, "def plan():\n\tif ready:\n\t\treturn 1\n\treturn 2\n"),
+      ).pipe(
+        Effect.andThen(
+          withTool(tmp.path, edit, (registry) =>
+            executeTool(
+              registry,
+              call({
+                path: "orchestrator.py",
+                oldString: "def plan():\n    if ready:\n        return 1",
+                newString: "def plan():\n    if ready:\n        return 10",
+              }),
+            ),
+          ),
+        ),
+        Effect.andThen((settled) =>
+          Effect.gen(function* () {
+            expect(settled).toMatchObject({ status: "completed", output: { replacements: 1 } })
+            expect(yield* Effect.promise(() => fs.readFile(target, "utf8"))).toBe(
+              "def plan():\n\tif ready:\n\t\treturn 10\n\treturn 2\n",
+            )
+          }),
+        ),
+      )
+    }),
+  )
+
+  it.live("restores indentation the model's copy lost", () =>
+    withTempDir((tmp) => {
+      const edit = makeEditFixture()
+      const target = path.join(tmp.path, "timeline_store.py")
+      return Effect.promise(() => fs.writeFile(target, "class Store:\n\tdef load(self):\n\t\tself.data = {}\n")).pipe(
+        Effect.andThen(
+          withTool(tmp.path, edit, (registry) =>
+            executeTool(
+              registry,
+              // The copy lost one level of indentation on both lines.
+              call({
+                path: "timeline_store.py",
+                oldString: "def load(self):\n\tself.data = {}",
+                newString: "def load(self):\n\tself.data = []",
+              }),
+            ),
+          ),
+        ),
+        Effect.andThen((settled) =>
+          Effect.gen(function* () {
+            expect(settled).toMatchObject({ status: "completed", output: { replacements: 1 } })
+            expect(yield* Effect.promise(() => fs.readFile(target, "utf8"))).toBe(
+              "class Store:\n\tdef load(self):\n\t\tself.data = []\n",
+            )
+          }),
+        ),
+      )
+    }),
+  )
+
+  it.live("rejects an indentation-insensitive match that is not unique", () =>
+    withTempDir((tmp) => {
+      const edit = makeEditFixture()
+      const target = path.join(tmp.path, "ambiguous.py")
+      return Effect.promise(() => fs.writeFile(target, "if a:\n    pass\nif a:\n\tpass\n")).pipe(
+        Effect.andThen(
+          withTool(tmp.path, edit, (registry) =>
+            executeTool(
+              registry,
+              call({
+                path: "ambiguous.py",
+                oldString: "if a:\n  pass",
+                newString: "if a:\n  return",
+              }),
+            ),
+          ),
+        ),
+        Effect.tap((result) =>
+          Effect.sync(() =>
+            expect(result).toEqual({
+              status: "error",
+              error: {
+                type: "tool.execution",
+                message:
+                  "oldString matches 2 locations only when indentation is ignored, and not exactly anywhere. Check tabs vs spaces, re-read the file, and add surrounding context to make oldString unique.",
+              },
+            }),
+          ),
+        ),
+        Effect.andThen(() => Effect.promise(() => fs.readFile(target, "utf8"))),
+        Effect.tap((content) => Effect.sync(() => expect(content).toBe("if a:\n    pass\nif a:\n\tpass\n"))),
       )
     }),
   )

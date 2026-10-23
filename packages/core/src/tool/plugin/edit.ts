@@ -64,10 +64,16 @@ const findOccurrences = (content: string, search: string) => {
 }
 
 const findLineOccurrences = (content: string, search: string) => {
-  const trailingNewline = search.endsWith("\n")
-  const expected = search.split("\n")
-  if (trailingNewline) expected.pop()
-  const lines = [...content.matchAll(/[^\n]*(?:\n|$)/g)]
+  const lines = splitLines(content)
+  return matchLineSequences(lines, search, (actual, expected) =>
+    normalizeForMatch(actual.trimEnd()) === normalizeForMatch(expected.trimEnd()),
+  )
+}
+
+type LineSequence = ReturnType<typeof splitLines>[number]
+
+const splitLines = (content: string) =>
+  [...content.matchAll(/[^\n]*(?:\n|$)/g)]
     .filter((match) => match[0] !== "")
     .map((match) => {
       const newline = match[0].endsWith("\n")
@@ -80,26 +86,46 @@ const findLineOccurrences = (content: string, search: string) => {
         newline,
       }
     })
+
+/** Compares each line with `compare` and returns the non-overlapping whole-line match windows. */
+const matchLineSequences = (
+  lines: readonly LineSequence[],
+  search: string,
+  compare: (actual: string, expected: string) => boolean,
+) => {
+  const trailingNewline = search.endsWith("\n")
+  const expected = search.split("\n")
+  if (trailingNewline) expected.pop()
   const candidates = lines.flatMap((line, index) => {
     const actual = lines.slice(index, index + expected.length)
     if (actual.length !== expected.length) return []
-    if (
-      !actual.every(
-        (item, lineIndex) =>
-          normalizeForMatch(item.text.trimEnd()) === normalizeForMatch(expected[lineIndex].trimEnd()),
-      )
-    )
-      return []
+    if (!actual.every((item, lineIndex) => compare(item.text, expected[lineIndex]!))) return []
     const last = actual.at(-1)!
     if (trailingNewline && !last.newline) return []
-    return [{ start: line.start, end: trailingNewline ? last.end : last.contentEnd }]
+    return [{ start: line.start, end: trailingNewline ? last.end : last.contentEnd, lines: actual }]
   })
-  return candidates.reduce<Match[]>((result, candidate) => {
+  return candidates.reduce<{ start: number; end: number; lines: readonly LineSequence[] }[]>((result, candidate) => {
     if (result.some((match) => match.end > candidate.start && match.start < candidate.end)) return result
     result.push(candidate)
     return result
   }, [])
 }
+
+const leadingWhitespace = (line: string) => /^[ \t]*/.exec(line)![0]!
+
+/**
+ * Matches each line ignoring its leading whitespace, so a model that copied Read output with tabs expanded to
+ * spaces, or lost or added a level of indentation, still matches. Returns each match's file-side indents so the
+ * replacement can carry the file's real indentation.
+ */
+const findIndentOccurrences = (content: string, search: string) =>
+  matchLineSequences(splitLines(content), search, (actual, expected) =>
+    normalizeForMatch(actual.trim()) === normalizeForMatch(expected.trim()),
+  ).map((match) => ({
+    start: match.start,
+    end: match.end,
+    indents: match.lines.map((line) => leadingWhitespace(line.text)),
+  }))
 
 /** The dominant line ending in text, or fallback when there is none. */
 const lineEnding = (text: string, fallback: string) => {
@@ -175,16 +201,67 @@ const matchView = (source: string, oldString: string, newString: string) => {
   // These one-to-one mappings preserve offsets into the LF view.
   const unicode = exact.length > 0 ? [] : findOccurrences(normalizeForMatch(view), normalizeForMatch(search))
   const trailing = exact.length > 0 || unicode.length > 0 ? [] : findLineOccurrences(view, search)
+  // Last tier: the model's copy differs only in leading whitespace, e.g. tabs expanded to spaces or a lost or
+  // added indentation level. The file's own indents carry into the replacement.
+  const indents = exact.length > 0 || unicode.length > 0 || trailing.length > 0 ? [] : findIndentOccurrences(view, search)
+  const mappings = new Map(indents.map((match) => [match.start, match.indents] as const))
   return {
-    matches: (exact.length > 0 ? exact : unicode.length > 0 ? unicode : trailing).map((match) => ({
-      start: match.start + countBefore(removed, match.start),
-      end: match.end + countBefore(removed, match.end),
-    })),
+    matches: (exact.length > 0 ? exact : unicode.length > 0 ? unicode : trailing.length > 0 ? trailing : indents).map(
+      (match) => ({
+        start: match.start + countBefore(removed, match.start),
+        end: match.end + countBefore(removed, match.end),
+      }),
+    ),
+    // Whether the matches came from the indentation-tolerant tier; the failures below say so.
+    indent: indents.length > 0 && exact.length === 0 && unicode.length === 0 && trailing.length === 0,
     replace: (match: Match) => {
       const region = source.slice(match.start, match.end)
-      return withRegionEndings(region, replacement, lineEnding(region, fileEnding))
+      const regionEnding = lineEnding(region, fileEnding)
+      const carried = mappings.get(
+        // The LF-view start of a source offset: every removed \r before it pushed the source offset further.
+        match.start - countBefore(removed, match.start),
+      )
+      return carried
+        ? withRegionEndings(region, reindent(search, replacement, carried), regionEnding)
+        : withRegionEndings(region, replacement, regionEnding)
     },
   }
+}
+
+/**
+ * Rewrites `replacement` so its lines keep the file's indentation. Lines that align with an oldString line (same
+ * trimmed content, longest common subsequence) map that line's declared prefix onto the file's own; changed and
+ * added lines borrow the nearest aligned line's prefix transformation, repeating it for deeper levels. Lines with
+ * nothing to borrow keep the model's own indentation.
+ */
+const reindent = (search: string, replacement: string, indents: readonly string[]) => {
+  const expected = search.split("\n")
+  const after = replacement.split("\n")
+  const aligned = alignLines(
+    expected.map((line) => normalizeForMatch(line.trim())),
+    after.map((line) => normalizeForMatch(line.trim())),
+  )
+  // The nearest aligned line at or before `index`, else the first aligned line.
+  const shift = (index: number) => {
+    for (let at = index; at >= 0; at--) if (aligned[at] !== undefined) return aligned[at]
+    return aligned.find((value) => value !== undefined)
+  }
+  return after
+    .map((line, index) => {
+      const at = aligned[index] ?? shift(index)
+      if (at === undefined) return line
+      const declared = leadingWhitespace(expected[at]!)
+      const actual = indents[at]!
+      if (declared === "") return actual + line
+      let rest = line
+      let count = 0
+      while (rest.startsWith(declared)) {
+        rest = rest.slice(declared.length)
+        count++
+      }
+      return count === 0 ? line : actual.repeat(count) + rest
+    })
+    .join("\n")
 }
 
 /** Number of sorted positions strictly before offset. */
@@ -278,16 +355,19 @@ export const Plugin = {
                 return {
                   endingsOnly,
                   ...(endingsOnly
-                    ? { matches: findOccurrences(source, oldString), replace: () => newString }
+                    ? { matches: findOccurrences(source, oldString), replace: () => newString, indent: false }
                     : matchView(source, oldString, newString)),
                 }
               }
-              let { matches, replace, endingsOnly } = attempt(input.oldString, input.newString)
+              let { matches, replace, endingsOnly, indent } = attempt(input.oldString, input.newString)
               // Read prefixes every text line with "N: "; when the model copied those prefixes along, retry
               // without them. newString keeps its own prefixes unless every one of its lines carries them too.
               const unprefixedOld = stripReadLineNumbers(input.oldString)
               if (matches.length === 0 && unprefixedOld !== undefined && unprefixedOld !== "" && unprefixedOld !== input.oldString)
-                ({ matches, replace, endingsOnly } = attempt(unprefixedOld, stripReadLineNumbers(input.newString) ?? input.newString))
+                ({ matches, replace, endingsOnly, indent } = attempt(
+                  unprefixedOld,
+                  stripReadLineNumbers(input.newString) ?? input.newString,
+                ))
               const replacements = matches.length
               const replaced = (input.replaceAll === true ? matches : matches.slice(0, 1))
                 .toReversed()
@@ -309,19 +389,21 @@ export const Plugin = {
                 source: permissionSource,
               })
               if (replacements === 0) {
-                // A first line that carries Read's prefix while not every line does keeps the strip fallback
-                // from applying, so point the model at the prefix it left in.
+                // A line that carries Read's prefix while not every line does keeps the strip fallback from
+                // applying, so point the model at the prefix it left in.
                 const hint =
-                  unprefixedOld === undefined && readLinePrefix.test(input.oldString)
+                  unprefixedOld === undefined && input.oldString.split("\n").some((line) => readLinePrefix.test(line))
                     ? " Hint: remove the 'N: ' line-number prefixes that Read adds; they are not part of the file."
                     : ""
                 return yield* new ToolFailure({
-                  message: `Could not find oldString in ${input.path}. It must match exactly, including whitespace and indentation.${hint}`,
+                  message: `Could not find oldString in ${input.path}. It must match exactly, including whitespace and indentation. The file may have changed since it was last read, or the copied text differs in indentation (tabs vs spaces); re-read the file and retry with its current content.${hint}`,
                 })
               }
               if (replacements > 1 && input.replaceAll !== true) {
                 return yield* new ToolFailure({
-                  message: `Found ${replacements} matches for oldString, but expected exactly one. Add more surrounding context to make oldString unique, or set replaceAll to true to replace every occurrence.`,
+                  message: indent
+                    ? `oldString matches ${replacements} locations only when indentation is ignored, and not exactly anywhere. Check tabs vs spaces, re-read the file, and add surrounding context to make oldString unique.`
+                    : `Found ${replacements} matches for oldString, but expected exactly one. Add more surrounding context to make oldString unique, or set replaceAll to true to replace every occurrence.`,
                 })
               }
               if (replaced === source) {
