@@ -58,6 +58,32 @@ const kindDotColor = (kind: ChangeKind) => {
   return "background-color: var(--icon-diff-modified-base)"
 }
 
+/** A file's uncommitted Git state, as the source-control tree marks it. */
+export type FileGitStatus = {
+  readonly status: "added" | "deleted" | "modified"
+  readonly staged: boolean
+}
+
+// Green for what a commit would record, amber for work still to stage, red for a deletion.
+const gitToken = (status: FileGitStatus) => {
+  if (status.status === "deleted") return "--text-diff-delete-base"
+
+  if (status.status === "added" || status.staged) return "--text-diff-add-base"
+
+  return "--text-diff-modified-base"
+}
+
+const gitLabel = (status: FileGitStatus) => {
+  if (status.status === "added") return status.staged ? "A" : "U"
+
+  if (status.status === "deleted") return "D"
+
+  return "M"
+}
+
+// Directory nodes keep a trailing separator; status keys never do.
+const statusLookup = (path: string) => path.replace(/[\\/]+$/, "")
+
 const visibleKind = (node: FileNode, kinds?: ReadonlyMap<string, ChangeKind>, marks?: Set<string>) => {
   const kind = kinds?.get(node.path)
 
@@ -80,6 +106,7 @@ const FileTreeNode = (
       draggable: boolean
       kinds?: ReadonlyMap<string, ChangeKind>
       marks?: Set<string>
+      status?: ReadonlyMap<string, FileGitStatus>
       as?: "div" | "button"
     },
 ) => {
@@ -92,21 +119,51 @@ const FileTreeNode = (
     "draggable",
     "kinds",
     "marks",
+    "status",
     "as",
     "children",
     "class",
     "classList",
   ])
 
+  const git = () => local.status?.get(statusLookup(local.node.path))
   const kind = () => visibleKind(local.node, local.kinds, local.marks)
-  const active = () => !!kind() && !local.node.ignored
+  const marked = () => !local.node.ignored && (!!git() || !!kind())
 
   const color = () => {
+    const gitStatus = git()
+
+    if (gitStatus) return `color: var(${gitToken(gitStatus)})`
+
     const value = kind()
 
     if (!value) return
 
     return kindTextColor(value)
+  }
+
+  const label = () => {
+    const gitStatus = git()
+
+    if (gitStatus) return gitLabel(gitStatus)
+
+    const value = kind()
+
+    if (!value) return
+
+    return kindLabel(value)
+  }
+
+  const dot = () => {
+    const gitStatus = git()
+
+    if (gitStatus) return `background-color: var(${gitToken(gitStatus)})`
+
+    const value = kind()
+
+    if (!value) return
+
+    return kindDotColor(value)
   }
 
   return (
@@ -133,27 +190,27 @@ const FileTreeNode = (
       <span
         classList={{
           "flex-1 min-w-0 text-12-medium whitespace-nowrap truncate": true,
-          "text-text-weaker": local.node.ignored,
-          "text-text-weak": !local.node.ignored && !active(),
+          "text-text-weak": local.node.ignored,
+          "text-text-base": !local.node.ignored && !marked(),
         }}
-        style={active() ? color() : undefined}
+        style={marked() ? color() : undefined}
       >
         {local.node.name}
       </span>
       {(() => {
-        const value = kind()
+        const text = label()
 
-        if (!value) return null
+        if (!text) return null
 
         if (local.node.type === "file") {
           return (
-            <span class="shrink-0 w-4 text-center text-12-medium" style={kindTextColor(value)}>
-              {kindLabel(value)}
+            <span class="shrink-0 w-4 text-center text-12-medium" style={color()}>
+              {text}
             </span>
           )
         }
 
-        return <div class="shrink-0 size-1.5 mr-1.5 rounded-full" style={kindDotColor(value)} />
+        return <div class="shrink-0 size-1.5 mr-1.5 rounded-full" style={dot()} />
       })()}
     </Dynamic>
   )
@@ -173,6 +230,7 @@ export default function FileTree(props: {
   allowed?: readonly string[]
   modified?: readonly string[]
   kinds?: ReadonlyMap<string, ChangeKind>
+  status?: ReadonlyMap<string, FileGitStatus>
   draggable?: boolean
   onFileClick?: (file: FileNode) => void
   onFileDoubleClick?: (file: FileNode) => void
@@ -379,7 +437,20 @@ export default function FileTree(props: {
           const expanded = () => file.tree.state(node.path)?.expanded ?? false
           const deep = () => deeps().get(node.path) ?? -1
           const kind = () => visibleKind(node, kinds(), marks())
-          const active = () => !!kind() && !node.ignored
+          const git = () => props.status?.get(statusLookup(node.path))
+          const active = () => !node.ignored && (!!kind() || !!git())
+
+          const iconColor = () => {
+            const gitStatus = git()
+
+            if (gitStatus) return `color: var(${gitToken(gitStatus)})`
+
+            const value = kind()
+
+            if (!value) return
+
+            return kindTextColor(value)
+          }
 
           return (
             <Switch>
@@ -407,6 +478,7 @@ export default function FileTree(props: {
                         draggable={draggable()}
                         kinds={kinds()}
                         marks={marks()}
+                        status={props.status}
                         onClick={() => props.onSelect?.(node.path)}
                         onContextMenu={() => props.onSelect?.(node.path)}
                       >
@@ -437,6 +509,7 @@ export default function FileTree(props: {
                         allowed={props.allowed}
                         modified={props.modified}
                         kinds={props.kinds}
+                        status={props.status}
                         active={props.active}
                         selected={props.selected}
                         onSelect={props.onSelect}
@@ -468,6 +541,7 @@ export default function FileTree(props: {
                     draggable={draggable()}
                     kinds={kinds()}
                     marks={marks()}
+                    status={props.status}
                     as="button"
                     type="button"
                     onClick={() => props.onFileClick?.(node)}
@@ -488,7 +562,7 @@ export default function FileTree(props: {
                         <FileIcon
                           node={node}
                           class="size-4 filetree-icon filetree-icon--mono"
-                          style={kindTextColor(kind()!)}
+                          style={iconColor()}
                           mono
                         />
                       </Match>

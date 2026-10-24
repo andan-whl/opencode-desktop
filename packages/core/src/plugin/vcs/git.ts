@@ -105,6 +105,7 @@ function make(proc: AppProcess.Interface, input: { directory: string; worktree: 
               additions: stat?.additions ?? 0,
               deletions: stat?.deletions ?? 0,
               status: item.status,
+              staged: isStaged(item.code),
             } satisfies FileStatus
           }),
       )
@@ -182,6 +183,9 @@ const kind = (code: string): Kind => {
   if (code.includes("D") && !code.includes("A")) return "deleted"
   return "modified"
 }
+
+// A porcelain v1 code is two columns: the index (staged) state, then the worktree state.
+const isStaged = (code: string) => code !== "??" && code[0] !== " " && code[0] !== "?"
 
 const nuls = (text: string) => text.split("\0").filter(Boolean)
 

@@ -33,5 +33,7 @@ export const FileStatus = Schema.Struct({
   additions: NonNegativeInt,
   deletions: NonNegativeInt,
   status: Schema.Literals(["added", "deleted", "modified"]),
+  /** The index holds part of this change, so a commit would record it. Providers without a staging area omit it. */
+  staged: optional(Schema.Boolean),
 }).annotate({ identifier: "Vcs.FileStatus" })
 export interface FileStatus extends Schema.Schema.Type<typeof FileStatus> {}

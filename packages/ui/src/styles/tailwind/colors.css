@@ -88,6 +88,7 @@
   --color-text-on-info-base: var(--text-on-info-base);
   --color-text-diff-add-base: var(--text-diff-add-base);
   --color-text-diff-delete-base: var(--text-diff-delete-base);
+  --color-text-diff-modified-base: var(--text-diff-modified-base);
   --color-text-diff-delete-strong: var(--text-diff-delete-strong);
   --color-text-diff-add-strong: var(--text-diff-add-strong);
   --color-text-on-info-weak: var(--text-on-info-weak);

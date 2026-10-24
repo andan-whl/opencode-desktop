@@ -298,6 +298,7 @@ export type VcsFileStatus = {
   additions: number
   deletions: number
   status: "added" | "deleted" | "modified"
+  staged?: boolean
 }
 
 export type VcsBranchList = Array<string>

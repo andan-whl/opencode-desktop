@@ -183,6 +183,7 @@
   --text-on-info-base: rgba(0, 0, 0, 0.574);
   --text-diff-add-base: #3a8437;
   --text-diff-delete-base: #ed4831;
+  --text-diff-modified-base: #9a6700;
   --text-diff-delete-strong: #601a0f;
   --text-diff-add-strong: #1d3e1c;
   --text-on-info-weak: rgba(0, 0, 0, 0.453);
@@ -454,6 +455,7 @@
     --text-on-info-base: rgba(255, 255, 255, 0.603);
     --text-diff-add-base: #9bcd97;
     --text-diff-delete-base: #fc533a;
+    --text-diff-modified-base: #e3b341;
     --text-diff-delete-strong: #ffe0da;
     --text-diff-add-strong: #4a7348;
     --text-on-info-weak: rgba(255, 255, 255, 0.404);

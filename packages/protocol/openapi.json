@@ -9015,6 +9015,176 @@
         "summary": "Find files"
       }
     },
+    "/api/fs/grep": {
+      "get": {
+        "tags": ["filesystem"],
+        "operationId": "fs.grep",
+        "parameters": [
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "directory": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false,
+            "style": "deepObject",
+            "explode": true
+          },
+          {
+            "name": "pattern",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "Regex pattern, or a literal when literal is true."
+            },
+            "required": true
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional glob restricting which files are searched, e.g. *.ts"
+            },
+            "required": false
+          },
+          {
+            "name": "literal",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": ["true", "false"]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Match the pattern literally."
+            },
+            "required": false
+          },
+          {
+            "name": "caseSensitive",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": ["true", "false"]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Defaults to case-sensitive matching."
+            },
+            "required": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "location": {
+                      "$ref": "#/components/schemas/Location.PublicRef"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FileSystem.Match"
+                      }
+                    }
+                  },
+                  "required": ["location", "data"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Search file content with a regex (or literal) pattern relative to the requested location, returning matches with line numbers and submatch offsets.",
+        "summary": "Search file content"
+      }
+    },
     "/api/experimental/fs/write": {
       "post": {
         "tags": ["filesystem"],
@@ -14750,10 +14920,10 @@
         "type": "object",
         "properties": {
           "modelID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Model.ID"
           },
           "family": {
-            "type": "string"
+            "$ref": "#/components/schemas/Model.Family"
           },
           "name": {
             "type": "string"
@@ -14785,7 +14955,7 @@
               "type": "object",
               "properties": {
                 "id": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/Model.VariantID"
                 },
                 "settings": {
                   "$ref": "#/components/schemas/Config.Model.Settings"
@@ -14850,9 +15020,14 @@
                 "type": "null"
               }
             ]
+          },
+          "providers": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Config.ProviderEncoded"
+            }
           }
         },
-        "required": ["shell"],
         "additionalProperties": false
       },
       "Config.Plugin.EntryEncoded": {
@@ -15342,6 +15517,51 @@
           }
         },
         "required": ["path", "type"],
+        "additionalProperties": false
+      },
+      "FileSystem.Match": {
+        "type": "object",
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/FileSystem.Entry"
+          },
+          "line": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "text": {
+            "type": "string"
+          },
+          "submatches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileSystem.Submatch"
+            }
+          }
+        },
+        "required": ["entry", "line", "offset", "text", "submatches"],
+        "additionalProperties": false
+      },
+      "FileSystem.Submatch": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": ["text", "start", "end"],
         "additionalProperties": false
       },
       "FileSystem.Write": {
@@ -17242,14 +17462,20 @@
         "required": ["input", "output", "cache"],
         "additionalProperties": false
       },
+      "Model.Family": {
+        "type": "string"
+      },
+      "Model.ID": {
+        "type": "string"
+      },
       "Model.Info": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/Model.ID"
           },
           "modelID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Model.ID"
           },
           "providerID": {
             "$ref": "#/components/schemas/Provider.ID"
@@ -17258,7 +17484,7 @@
             "$ref": "#/components/schemas/Provider.ID"
           },
           "family": {
-            "type": "string"
+            "$ref": "#/components/schemas/Model.Family"
           },
           "name": {
             "type": "string"
@@ -17364,13 +17590,13 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/Model.ID"
           },
           "providerID": {
             "$ref": "#/components/schemas/Provider.ID"
           },
           "variant": {
-            "type": "string"
+            "$ref": "#/components/schemas/Model.VariantID"
           }
         },
         "required": ["id", "providerID"],
@@ -17397,7 +17623,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/Model.VariantID"
           },
           "settings": {
             "$ref": "#/components/schemas/Model.Settings"
@@ -17414,6 +17640,9 @@
         },
         "required": ["id"],
         "additionalProperties": false
+      },
+      "Model.VariantID": {
+        "type": "string"
       },
       "Money.USD": {
         "type": "number"
@@ -20849,6 +21078,9 @@
           "status": {
             "type": "string",
             "enum": ["added", "deleted", "modified"]
+          },
+          "staged": {
+            "type": "boolean"
           }
         },
         "required": ["file", "additions", "deletions", "status"],

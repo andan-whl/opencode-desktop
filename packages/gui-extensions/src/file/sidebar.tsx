@@ -1,5 +1,7 @@
 import { createMemo, createSignal, Match, onCleanup, Show, Switch } from "solid-js"
 import { Dynamic } from "solid-js/web"
+import { debounce } from "@solid-primitives/scheduled"
+import { createQuery, useQueryClient } from "@tanstack/solid-query"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import {
@@ -13,7 +15,7 @@ import type { ChangeKind } from "../review/contract"
 import { createKeyed, useExtension, type MountedSession, type SessionScreen } from "../sdk"
 import { current, useShared } from "./context"
 import { useOpenInApp } from "./open-in-app"
-import FileTree from "./tree"
+import FileTree, { type FileGitStatus } from "./tree"
 import FileSearchView from "./search-view"
 
 /** The file tree beside the side panel: the view the activity bar selects, or every workspace file. */
@@ -67,6 +69,67 @@ export default function FileSidebar(props: { session: MountedSession; screen: Se
   const diffFiles = createMemo(() => (changes()?.diffs(props.session) ?? []).map((diff) => diff.file))
   const kinds = createMemo(() => changes()?.kinds(props.session) ?? empty)
 
+  const queryClient = useQueryClient()
+  const statusKey = createMemo(() => [ctx.id, props.session.server.id, "file-tree-vcs-status", file.root] as const)
+
+  // The workspace's uncommitted Git state, which colors the tree. Providers without a VCS never load it.
+  const statusQuery = createQuery(() => ({
+    queryKey: statusKey(),
+    enabled: props.session.server.connected && !!props.session.project?.vcs,
+    refetchOnMount: "always" as const,
+    queryFn: () =>
+      props.session.server.client.vcs
+        .status({ location: { directory: file.root } })
+        .then((result) => result.data)
+        .catch(() => []),
+  }))
+
+  const refreshStatus = debounce(() => void queryClient.invalidateQueries({ queryKey: statusKey() }), 100)
+
+  // Git changes files in the workspace, including the writes apply-all and revert-all make.
+  createKeyed(
+    () => ({ directory: file.root, data: props.session.server.data }),
+    (current) =>
+      onCleanup(
+        current.data.listen(({ details }) => {
+          if (details.type === "filesystem.changed" && details.location?.directory === current.directory) refreshStatus()
+        }),
+      ),
+    { equals: (previous, next) => previous.directory === next.directory && previous.data === next.data },
+  )
+
+  // Each changed file, and every directory above it, so the tree can color both.
+  const status = createMemo(() => {
+    const rows = statusQuery.isFetched ? (statusQuery.data ?? []) : []
+
+    if (rows.length === 0) return
+
+    const prefix = relativePrefix(props.session.project?.worktree, file.root)
+    const out = new Map<string, FileGitStatus>()
+
+    for (const row of rows) {
+      const path = stripPrefix(normalizeStatusPath(row.file), prefix)
+
+      if (!path) continue
+
+      const value: FileGitStatus = { status: row.status, staged: !!row.staged }
+      const parts = path.split("/")
+
+      out.set(path, value)
+      parts.slice(0, -1).forEach((_, index) => {
+        const dir = parts.slice(0, index + 1).join("/")
+
+        if (!dir) return
+
+        const known = out.get(dir)
+
+        out.set(dir, known ? mergeGitStatus(known, value) : value)
+      })
+    }
+
+    return out
+  })
+
   // The middle column's file, shown as the tree's active row. The tree keys paths with forward slashes, and a
   // path outside the workspace never lists in it, so both stay out of the highlight.
   const activeFile = createMemo(() => {
@@ -119,6 +182,7 @@ export default function FileSidebar(props: { session: MountedSession; screen: Se
                 openIn={openIn}
                 modified={diffFiles()}
                 kinds={kinds()}
+                status={status()}
                 onFileClick={(node) => {
                   setSelected(node.path)
                   shared.open(props.session, node.path)
@@ -207,6 +271,36 @@ export default function FileSidebar(props: { session: MountedSession; screen: Se
       </Switch>
     </div>
   )
+}
+
+const normalizeAbsolute = (value: string) =>
+  value.replaceAll("\\", "/").replace(/\/{2,}/g, "/").replace(/\/+$/, "")
+
+// Git lists paths from the worktree root; when the session runs below it, that prefix is not part of the workspace.
+function relativePrefix(worktree: string | undefined, directory: string) {
+  if (!worktree) return ""
+
+  const root = normalizeAbsolute(worktree)
+  const dir = normalizeAbsolute(directory)
+
+  if (root.toLowerCase() === dir.toLowerCase()) return ""
+
+  return dir.toLowerCase().startsWith(`${root.toLowerCase()}/`) ? dir.slice(root.length + 1) : ""
+}
+
+const normalizeStatusPath = (value: string) =>
+  value.replaceAll("\\", "/").replace(/^\.\//, "").replace(/^\/+/, "").replace(/\/+$/, "")
+
+// Status rows may already be workspace-relative; the prefix only strips when it actually leads the path.
+function stripPrefix(path: string, prefix: string) {
+  if (!prefix) return path
+
+  return path.toLowerCase().startsWith(`${prefix.toLowerCase()}/`) ? path.slice(prefix.length + 1) : path
+}
+
+// A directory shows one mark: its children's state when they agree, otherwise a modified mark, staged only as a whole.
+function mergeGitStatus(a: FileGitStatus, b: FileGitStatus): FileGitStatus {
+  return { status: a.status === b.status ? a.status : "modified", staged: a.staged && b.staged }
 }
 
 /** The workspace header of the explorer view: the project the session runs in, and its directory. */

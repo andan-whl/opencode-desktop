@@ -83,6 +83,7 @@
 --text-on-info-base: var(--smoke-dark-alpha-11);
 --text-diff-add-base: var(--mint-light-11);
 --text-diff-delete-base: var(--ember-light-10);
+--text-diff-modified-base: var(--amber-light-10);
 --text-diff-delete-strong: var(--ember-light-12);
 --text-diff-add-strong: var(--mint-light-12);
 --text-on-info-weak: var(--smoke-dark-alpha-9);
