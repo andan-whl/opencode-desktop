@@ -14,7 +14,7 @@ import { createStore } from "solid-js/store"
 import { Dynamic } from "solid-js/web"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import type { FileSearchHandle } from "@opencode/session-ui/file"
-import { resolveWholeFileDiff } from "@opencode/session-ui/session-diff"
+import { changesFingerprint, changesSettled, resolveWholeFileDiff } from "@opencode/session-ui/session-diff"
 import { useFileComponent } from "@opencode/ui/context/file"
 import { cloneSelectedLineRange, previewSelectedLines } from "@opencode/session-ui/pierre/selection-bridge"
 import { createLineCommentControllerV2 } from "@opencode/session-ui/v2/line-comment-annotations-v2"
@@ -281,8 +281,14 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
 
     if (!p) return undefined
 
+    const diffs = sessionDiffs() ?? []
+
+    // A change set applied or reverted in full no longer shows here: the working copy already holds the settled
+    // side, so the file edits as normal content. A later turn changes the fingerprint and shows diffs again.
+    if (changesSettled(props.session.id, changesFingerprint(diffs))) return undefined
+
     // A diff without a patch, e.g. a binary file, has no change points to show.
-    return (sessionDiffs() ?? []).find((diff) => diff.patch && file.resolve(diff.file) === p)
+    return diffs.find((diff) => diff.patch && file.resolve(diff.file) === p)
   })
 
   const changedDiff = createMemo(() => {

@@ -1,5 +1,6 @@
 import { parseDiffFromFile, parsePatchFiles, processFile, type FileDiffMetadata } from "@pierre/diffs"
 import { parsePatch } from "diff"
+import { createSignal } from "solid-js"
 import { checksum } from "@opencode/util/encode"
 import type { FileDiffInfo } from "@opencode/client/promise"
 import type { PresentationFileDiff } from "../file-presentation"
@@ -29,6 +30,26 @@ export type ViewDiff = {
 const diffCacheLimit = 16
 
 const patchFileDiffCache = new Map<string, FileDiffMetadata>()
+
+// Change sets an apply-all or revert-all settled, keyed by session id. A settled set stays dismissed everywhere it
+// would show — the changed-files list and the editor's whole-file diff — until a later turn changes files again, which
+// yields a different fingerprint. Module-level so remounts (tab switches) keep the dismissal.
+const [settledChanges, setSettledChanges] = createSignal(new Map<string, string>())
+
+/** The identity of a change set: the same files with the same line counts fingerprint the same, whatever their content. */
+export function changesFingerprint(files: ReadonlyArray<Pick<FileDiffInfo, "file" | "additions" | "deletions">>) {
+  return files.map((diff) => `${diff.file}:${diff.additions}:${diff.deletions}`).join("\n")
+}
+
+/** Records that a session's change set was applied or reverted in full, so it stays dismissed until files change again. */
+export function markChangesSettled(sessionID: string, fingerprint: string) {
+  setSettledChanges((current) => new Map(current).set(sessionID, fingerprint))
+}
+
+/** Whether the session's change set with this fingerprint was already applied or reverted in full. */
+export function changesSettled(sessionID: string | undefined, fingerprint: string) {
+  return !!sessionID && settledChanges().get(sessionID) === fingerprint
+}
 
 export function resolveFileDiff(diff: DiffSource) {
   // Untyped persisted payloads may carry `patch: null`; those render from their contents.

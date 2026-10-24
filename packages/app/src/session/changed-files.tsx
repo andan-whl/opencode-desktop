@@ -1,5 +1,10 @@
 import { createEffect, createMemo, createResource, createSignal, For, on, Show } from "solid-js"
-import { completePatchContents } from "@opencode/session-ui/session-diff"
+import {
+  changesFingerprint,
+  changesSettled,
+  completePatchContents,
+  markChangesSettled,
+} from "@opencode/session-ui/session-diff"
 import { DiffChanges } from "@opencode/ui/diff-changes"
 import { FileIcon } from "@opencode/ui/file-icon"
 import { Icon } from "@opencode/ui/icon"
@@ -10,10 +15,6 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { useServer } from "@/runtime/server/current"
 import { showToast } from "@/shell/notifications/toast"
 import type { SessionModel } from "@/session/model"
-
-// Fingerprints of change sets an apply-all or revert-all settled, keyed by session id: a settled list stays hidden
-// until a later turn changes files again. Module-level so remounts (tab switches) keep the dismissal.
-const dismissedChanges = new Map<string, string>()
 
 /**
  * The files the routed session changed, above the conversation. Clicking a row opens the file as the
@@ -31,7 +32,9 @@ export function SessionChangedFiles(props: { session: SessionModel }) {
 
   const [diffs, { refetch }] = createResource(sessionID, async (id) => {
     if (!id) return []
+
     const result = await server.ctx.sdk.api.session.diff({ sessionID: id }).catch(() => undefined)
+
     return result ?? []
   })
 
@@ -46,6 +49,7 @@ export function SessionChangedFiles(props: { session: SessionModel }) {
   )
 
   const files = createMemo(() => diffs() ?? [])
+
   const totals = createMemo(() =>
     files().reduce((acc, file) => ({ additions: acc.additions + file.additions, deletions: acc.deletions + file.deletions }), {
       additions: 0,
@@ -53,14 +57,9 @@ export function SessionChangedFiles(props: { session: SessionModel }) {
     }),
   )
 
-  // Fingerprints of the change sets an apply-all or revert-all settled, keyed by session: a settled list stays
-  // hidden until a later turn changes files again (its fingerprint differs).
-  const fingerprint = () =>
-    files()
-      .map((diff) => `${diff.file}:${diff.additions}:${diff.deletions}`)
-      .join("\n")
-
-  const settled = () => dismissedChanges.get(sessionID() ?? "") === fingerprint()
+  // A change set an apply-all or revert-all settled stays hidden — here and in the editor's whole-file diff —
+  // until a later turn changes files again, which yields a different fingerprint.
+  const settled = () => changesSettled(sessionID(), changesFingerprint(files()))
 
   // While the task runs, its own writes race a revert or apply, so the buttons wait for the idle turn.
   const running = () => {
@@ -97,7 +96,7 @@ export function SessionChangedFiles(props: { session: SessionModel }) {
 
       const id = sessionID()
 
-      if (id) dismissedChanges.set(id, fingerprint())
+      if (id) markChangesSettled(id, changesFingerprint(files()))
     } catch (error) {
       showToast({
         variant: "error",
