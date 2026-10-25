@@ -49,6 +49,12 @@ export class MockNotFound extends Schema.TaggedError<MockNotFound>()("MockNotFou
   message: Schema.String,
 }) {}
 
+// The protocol's 404 for an unknown session; route resolution turns it into the not-found fallback.
+export class MockSessionNotFound extends Schema.TaggedError<MockSessionNotFound>()("SessionNotFoundError", {
+  sessionID: Schema.String,
+  message: Schema.String,
+}) {}
+
 export class MockBadRequest extends Schema.TaggedError<MockBadRequest>()("MockBadRequest", {
   message: Schema.String,
 }) {}
@@ -288,7 +294,7 @@ const Group = HttpApiGroup.make("mock")
     HttpApiEndpoint.get("sessionGet", "/api/session/:sessionID", {
       params: SessionParams,
       success: Json,
-      error: MockNotFound.pipe(HttpApiSchema.status(404)),
+      error: MockSessionNotFound.pipe(HttpApiSchema.status(404)),
     }),
   )
   .add(

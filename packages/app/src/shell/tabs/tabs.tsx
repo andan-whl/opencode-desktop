@@ -229,6 +229,15 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
       if (draftID) removeDraftPersisted(draftID)
     }
 
+    // A tab that shows the session directly, or as its routed child.
+    const findSessionTab = (input: { server: ServerConnection.Key; sessionId: string }) =>
+      store.find(
+        (tab) =>
+          tab.type === "session" &&
+          tab.server === input.server &&
+          (tab.sessionId === input.sessionId || tab.routeSessionId === input.sessionId),
+      )
+
     const actions = {
       addSessionTab: (tab: Omit<SessionTab, "type">) => {
         const next = { type: "session" as const, ...tab }
@@ -446,17 +455,19 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
           navigateTab(entry.tab)
         })
       },
+      sessionTab(input: { server: ServerConnection.Key; sessionId: string }) {
+        return findSessionTab(input)
+      },
       removeSessionTab(input: Omit<SessionTab, "type">) {
         updateClosed((stack) => removeClosedTabs(stack, input.server, [input.sessionId]))
 
-        const index = store.findIndex(
-          (tab) =>
-            tab.type === "session" &&
-            tab.server === input.server &&
-            (tab.sessionId === input.sessionId || tab.routeSessionId === input.sessionId),
-        )
+        const tab = findSessionTab(input)
+        const index = tab ? store.indexOf(tab) : -1
 
-        if (index !== -1) removeTab(index)
+        if (index === -1) return false
+        removeTab(index)
+
+        return true
       },
       removeServer(key: ServerConnection.Key) {
         updateClosed((stack) => stack.filter((entry) => entry.tab.server !== key))

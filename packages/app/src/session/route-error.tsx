@@ -1,5 +1,6 @@
 import { Button } from "@opencode/ui/button"
-import { createMemo, Show } from "solid-js"
+import { useNavigate } from "@solidjs/router"
+import { createEffect, createMemo, Show } from "solid-js"
 import { ErrorPage } from "@/shell/errors/error"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useServer } from "@/runtime/server/current"
@@ -13,6 +14,7 @@ export function SessionErrorFallback(props: { error: unknown; sessionID?: string
   const activeServer = useServer()
   const server = useServers()
   const tabs = useTabs()
+  const navigate = useNavigate()
 
   const displayServer = createMemo(() => {
     const conn = server.list.find((item) => ServerConnection.key(item) === props.serverKey)
@@ -20,10 +22,28 @@ export function SessionErrorFallback(props: { error: unknown; sessionID?: string
     return conn ? serverName(conn) : props.serverKey
   })
 
+  // A restored route can name a session whose tab is already gone, so closing must still leave the page.
+  const close = (sessionID: string, serverKey: ServerConnection.Key) => {
+    if (tabs.removeSessionTab({ server: serverKey, sessionId: sessionID })) return
+    navigate("/")
+  }
+
   const closeSession = () => {
     if (!props.sessionID) return
-    tabs.removeSessionTab({ server: activeServer.key, sessionId: props.sessionID })
+    close(props.sessionID, activeServer.key)
   }
+
+  const notFound = () => isCurrentSessionNotFoundError(props.error, props.sessionID)
+
+  // A tab opened for a session that no longer exists keeps this page to explain what happened. Without a tab
+  // there is nothing to explain or close, which is the stale restored URL case, so return home instead.
+  createEffect(() => {
+    if (!notFound() || !tabs.ready() || !props.sessionID || !props.serverKey) return
+
+    if (tabs.sessionTab({ server: props.serverKey, sessionId: props.sessionID })) return
+
+    navigate("/")
+  })
 
   return (
     <Show
@@ -31,7 +51,7 @@ export function SessionErrorFallback(props: { error: unknown; sessionID?: string
       fallback={<IncompatibleServerPanel onClose={props.sessionID ? closeSession : undefined} />}
     >
       <Show
-        when={isCurrentSessionNotFoundError(props.error, props.sessionID)}
+        when={notFound()}
         fallback={<ErrorPage error={props.error} />}
       >
         <div class="flex-1 min-h-0 overflow-hidden">
@@ -58,7 +78,7 @@ export function SessionErrorFallback(props: { error: unknown; sessionID?: string
               icon="xmark-small"
               onClick={() => {
                 if (!props.sessionID || !props.serverKey) return
-                tabs.removeSessionTab({ server: props.serverKey, sessionId: props.sessionID })
+                close(props.sessionID, props.serverKey)
               }}
             >
               {language.t("session.error.notFound.closeTab")}
@@ -70,8 +90,8 @@ export function SessionErrorFallback(props: { error: unknown; sessionID?: string
   )
 }
 
-function isCurrentSessionNotFoundError(error: unknown, sessionID: string | undefined) {
+function isCurrentSessionNotFoundError(cause: unknown, sessionID: string | undefined) {
   if (!sessionID) return false
 
-  return isSessionNotFoundError(error, sessionID) || isLocalSessionNotFoundError(error, sessionID)
+  return isSessionNotFoundError(cause, sessionID) || isLocalSessionNotFoundError(cause, sessionID)
 }

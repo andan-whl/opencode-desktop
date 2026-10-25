@@ -275,6 +275,12 @@ test("shows the not found fallback when the viewed session is deleted", async ({
   await expect(page.getByRole("heading", { name: taskDescription })).toHaveCount(0)
 })
 
+test("returns home when a session route has no tab to close", async ({ page }) => {
+  await setup(page)
+  await page.goto(sessionHref("ses_restored_route_without_tab"))
+  await expectPath(page, "/")
+})
+
 test.describe("session ID links", () => {
   const target = "ses_0123456789abcdefghijklmnop"
   const missing = "ses_abcdefghijklmnopqrstuvwxyz"
