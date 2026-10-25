@@ -2,7 +2,7 @@
   "name": "@opencode/desktop",
   "private": true,
   "version": "2.0.28",
-  "desktopVersion": "1.0.16",
+  "desktopVersion": "1.0.17",
   "type": "module",
   "license": "MIT",
   "author": {
