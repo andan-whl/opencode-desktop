@@ -10,17 +10,13 @@ import {
   Suspense,
   Switch,
 } from "solid-js"
-import { createStore } from "solid-js/store"
 import { Dynamic } from "solid-js/web"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import type { FileSearchHandle } from "@opencode/session-ui/file"
 import { changesFingerprint, changesSettled, resolveWholeFileDiff } from "@opencode/session-ui/session-diff"
 import { useFileComponent } from "@opencode/ui/context/file"
-import { cloneSelectedLineRange, previewSelectedLines } from "@opencode/session-ui/pierre/selection-bridge"
-import { createLineCommentControllerV2 } from "@opencode/session-ui/v2/line-comment-annotations-v2"
+import { cloneSelectedLineRange } from "@opencode/session-ui/pierre/selection-bridge"
 import { sampledChecksum } from "@opencode/util/encode"
-import { LineCommentOverflowIcon } from "@opencode/ui/line-comment"
-import { Menu } from "@opencode/ui/menu"
 import { ScrollView } from "@opencode/ui/scroll-view"
 import { createKeyed, useExtension, type LineRange, type MountedSession, type SessionScreen } from "../sdk"
 import { artifactKind } from "@opencode/util/artifact"
@@ -32,51 +28,9 @@ import { fileTabPath } from "./path"
 // CodeMirror loads with the editor chunk alone, so the file browser never waits for it.
 const FileEditor = lazy(() => import("./editor"))
 
-type FileSelection = { startLine: number; endLine: number; startChar: number; endChar: number }
-
-function selectionFromLines(range: LineRange): FileSelection {
-  const startLine = Math.min(range.start, range.end)
-  const endLine = Math.max(range.start, range.end)
-
-  return {
-    startLine,
-    endLine,
-    startChar: 0,
-    endChar: 0,
-  }
-}
-
-const selectionSide = (range: LineRange) => range.endSide ?? range.side ?? "additions"
-
-function FileCommentMenu(props: {
-  moreLabel: string
-  editLabel: string
-  deleteLabel: string
-  onEdit: VoidFunction
-  onDelete: VoidFunction
-}) {
-  return (
-    <div onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
-      <Menu gutter={4}>
-        <Menu.Trigger as="button" type="button" data-slot="line-comment-v2-overflow" aria-label={props.moreLabel}>
-          <LineCommentOverflowIcon />
-        </Menu.Trigger>
-        <Menu.Portal>
-          <Menu.Content>
-            <Menu.Item onSelect={props.onEdit}>{props.editLabel}</Menu.Item>
-            <Menu.Item onSelect={props.onDelete}>{props.deleteLabel}</Menu.Item>
-          </Menu.Content>
-        </Menu.Portal>
-      </Menu>
-    </div>
-  )
-}
-
 type ScrollPos = { x: number; y: number }
 
 type ScrollSyncState = { scroll?: HTMLDivElement; scrollFrame?: number; restoreFrame?: number; pending?: ScrollPos }
-
-type NoteState = { openedComment: string | null; commenting: LineRange | null; selected: LineRange | null }
 
 type FindState = { find: FileSearchHandle | null }
 
@@ -211,8 +165,6 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
   const shared = useShared()
   const fileComponent = useFileComponent()
   const file = props.screen.file
-  const comment = props.screen.comment
-  const composer = props.screen.composer
   // The stored side tab key doubles as the scroll key, as it did before extensions.
   const key = () => `file:${props.id}`
   const active = () => shared.active(props.session, props.id)
@@ -309,128 +261,12 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
     set: (pos) => layout.scroll.set(props.session, key(), pos),
   })
 
-  const selectionPreview = (source: string, selection: FileSelection) => {
-    return previewSelectedLines(source, {
-      start: selection.startLine,
-      end: selection.endLine,
-    })
-  }
-
-  const buildPreview = (filePath: string, lines: LineRange) => {
-    const source = filePath === path() ? contents() : file.get(filePath)?.content?.content
-
-    if (!source) return undefined
-
-    return selectionPreview(source, selectionFromLines(lines))
-  }
-
-  const addCommentToContext = (input: {
-    file: string
-    selection: LineRange
-    comment: string
-    preview?: string
-    origin?: "review" | "file"
-  }) => {
-    const selection = selectionFromLines(input.selection)
-    const preview = input.preview ?? buildPreview(input.file, input.selection)
-
-    const saved = comment.add({
-      file: input.file,
-      selection: input.selection,
-      comment: input.comment,
-    })
-
-    composer.attach({
-      type: "file",
-      path: input.file,
-      selection,
-      comment: input.comment,
-      commentID: saved.id,
-      commentOrigin: input.origin,
-      preview,
-    })
-  }
-
-  const updateCommentInContext = (input: { id: string; file: string; selection: LineRange; comment: string }) => {
-    comment.update(input.id, input.comment)
-    const preview = input.file === path() ? buildPreview(input.file, input.selection) : undefined
-    // The composer keeps a chip's preview unless the update names a new one.
-    composer.update(input.id, preview ? { comment: input.comment, preview } : { comment: input.comment })
-  }
-
-  const removeCommentFromContext = (input: { id: string; file: string }) => {
-    comment.remove(input.id)
-    composer.detach(input.id)
-  }
-
-  const fileComments = createMemo(() => {
-    const p = path()
-
-    if (!p) return []
-
-    return [...comment.list(p)]
-  })
-
-  const commentedLines = createMemo(() => fileComments().map((comment) => comment.selection))
-
-  const [note, setNote] = createStore<NoteState>({ openedComment: null, commenting: null, selected: null })
-
   const syncSelected = (range: LineRange | null) => {
     const p = path()
 
     if (!p) return
     file.selection.set(p, range ? cloneSelectedLineRange(range) : null)
   }
-
-  const activeSelection = () => note.selected ?? selectedLines()
-
-  const commentsUi = createLineCommentControllerV2({
-    comments: fileComments,
-    label: ctx.t("ui.lineComment.submit"),
-    draftKey: () => path() ?? props.id,
-    mention: {
-      items: (query) => file.search(query, { kind: "any" }),
-    },
-    getSide: selectionSide,
-    state: {
-      opened: () => note.openedComment,
-      setOpened: (id) => setNote("openedComment", id),
-      selected: () => note.selected,
-      setSelected: (range) => setNote("selected", range),
-      commenting: () => note.commenting,
-      setCommenting: (range) => setNote("commenting", range),
-      syncSelected,
-      hoverSelected: syncSelected,
-    },
-    onSubmit: ({ comment, selection }) => {
-      const p = path()
-
-      if (!p) return
-      addCommentToContext({ file: p, selection, comment, origin: "file" })
-    },
-    onUpdate: ({ id, comment, selection }) => {
-      const p = path()
-
-      if (!p) return
-      updateCommentInContext({ id, file: p, selection, comment })
-    },
-    onDelete: (comment) => {
-      const p = path()
-
-      if (!p) return
-      removeCommentFromContext({ id: comment.id, file: p })
-    },
-    editSubmitLabel: ctx.t("common.save"),
-    renderCommentActions: (_, controls) => (
-      <FileCommentMenu
-        moreLabel={ctx.t("common.moreOptions")}
-        editLabel={ctx.t("common.edit")}
-        deleteLabel={ctx.t("common.delete")}
-        onEdit={controls.edit}
-        onDelete={controls.remove}
-      />
-    ),
-  })
 
   // Mod+F finds in the shown file. The read-only code view and the editor both register a handle; when none is
   // registered, e.g. an artifact view, the event falls through to the host's timeline search.
@@ -453,29 +289,6 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
     { capture: true },
   )
 
-  // A new path, e.g. after the workspace directory changes, drops the comment draft and selection of the old one.
-  const moved = createMemo(on(path, () => ({}), { defer: true }))
-
-  createKeyed(moved, () => commentsUi.note.reset())
-
-  // A comment focused elsewhere, e.g. from its composer chip, opens here once this file shows.
-  createKeyed(
-    () => {
-      const focus = comment.focus.current()
-      const p = path()
-
-      if (!focus || !p || focus.file !== p || !active()) return
-
-      const target = fileComments().find((item) => item.id === focus.id)
-
-      return target && { target }
-    },
-    (focus) => {
-      commentsUi.note.openComment(focus.target.id, focus.target.selection, { cancelDraft: true })
-      requestAnimationFrame(() => comment.focus.set(null))
-    },
-  )
-
   const previous = { loaded: false, ready: false, active: false }
 
   createKeyed(
@@ -487,7 +300,6 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
     (target) =>
       onCleanup(
         shared.reveal.register(target.session, target.path, () => {
-          setNote("selected", null)
           scrollSync.queueRestore()
         }),
       ),
@@ -527,31 +339,11 @@ export function SessionFileView(props: { session: MountedSession; screen: Sessio
           cacheKey: cacheKey(),
         }}
         enableLineSelection
-        enableGutterUtility
-        selectedLines={activeSelection()}
-        commentedLines={commentedLines()}
+        selectedLines={selectedLines()}
         onRendered={() => {
           scrollSync.queueRestore()
         }}
-        annotations={commentsUi.annotations()}
-        renderAnnotation={commentsUi.renderAnnotation}
-        renderGutterUtility={commentsUi.renderGutterUtility}
-        onLineSelected={(range: LineRange | null) => {
-          commentsUi.onLineSelected(range)
-        }}
-        onLineSelectionEnd={(range: LineRange | null) => {
-          if (!range) {
-            commentsUi.note.select(null)
-            commentsUi.note.cancelDraft()
-
-            return
-          }
-
-          commentsUi.onLineSelectionEnd(range)
-        }}
-        onLineNumberSelectionEnd={(range: LineRange | null) => {
-          commentsUi.onLineNumberSelectionEnd(range)
-        }}
+        onLineSelected={syncSelected}
         search={search}
         class="select-text"
         // Media and previews have their own viewers below; the code view only ever shows text.

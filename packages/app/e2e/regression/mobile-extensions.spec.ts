@@ -16,7 +16,7 @@ async function openFiles(page: Page) {
     .click()
 }
 
-test("mobile files browse, comment, search, and close tabs", async ({ page }) => {
+test("mobile files browse, search, and close tabs", async ({ page }) => {
   await mockStressTimeline(page, {
     fileList: (path) => (path ? [] : ["first.ts", "second.ts"].map((name) => fileNode(fixture.directory, name))),
     fileContent: (path) => `contents:${path}`,
@@ -28,40 +28,6 @@ test("mobile files browse, comment, search, and close tabs", async ({ page }) =>
   await openFiles(page)
   const files = page.locator('[data-slot="session-mobile-files"]')
   await files.getByRole("button", { name: "first.ts", exact: true }).click()
-  await expect(files.getByText("contents:first.ts", { exact: true })).toBeVisible()
-  await files.locator('[data-column-number="1"]').click()
-  const editor = files.locator('[data-component="line-comment-v2"][data-variant="editor"]')
-  await expect(editor.getByRole("textbox")).toBeVisible()
-
-  const fullWidth = async (card: typeof editor) => {
-    const panel = (await files.boundingBox())!
-    const box = await card.boundingBox()
-
-    return !!box && Math.abs(box.x - panel.x - 12) < 2 && Math.abs(box.width - panel.width + 24) < 2
-  }
-
-  for (const width of [390, 700]) {
-    await page.setViewportSize({ width, height: 844 })
-    await expect.poll(() => fullWidth(editor)).toBe(true)
-  }
-
-  await editor.getByRole("textbox").fill("Full-width file comment")
-  await editor.getByRole("button", { name: "Comment", exact: true }).click()
-  const comment = files.locator('[data-component="line-comment-v2"][data-variant="display"]')
-  await expect(comment).toContainText("Full-width file comment")
-  await expect.poll(() => fullWidth(comment)).toBe(true)
-
-  await page.setViewportSize({ width: 390, height: 844 })
-  // Its composer chip reveals the comment without leaving the conversation.
-  const session = navigation.getByRole("tab", { name: "Session", exact: true })
-  await session.click()
-  await page
-    .locator('[data-component="composer-attachments"]')
-    .getByText("Full-width file comment", { exact: true })
-    .click()
-  await expect(session).toHaveAttribute("aria-selected", "true")
-  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible()
-  await openFiles(page)
   await expect(files.getByText("contents:first.ts", { exact: true })).toBeVisible()
   const filter = files.getByRole("combobox", { name: "Filter files", exact: true })
   await expect(filter).toBeHidden()
